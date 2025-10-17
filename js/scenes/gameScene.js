@@ -15,6 +15,13 @@ class GameScene extends Scene {
         this.gameState = 'playing'; // 'playing', 'paused', 'game_over'
         this.gameTime = 0;
         
+        // 射击统计
+        this.shootingStats = {
+            shotsFired: 0,
+            shotsHit: 0,
+            maxCombo: 0
+        };
+        
         this.initializeEntities();
     }
     
@@ -28,15 +35,31 @@ class GameScene extends Scene {
         // 创建障碍物管理器
         this.obstacleManager = new ObstacleManager();
         
+        // 创建子弹管理器
+        this.bulletManager = new BulletManager();
+        
         // 创建得分系统
         this.scoreSystem = new ScoreSystem();
         
         // 创建碰撞系统
         this.collisionSystem = new CollisionSystem();
         
+        // 创建效果系统
+        this.effectSystem = new EffectSystem();
+        
         // 注册碰撞回调
         this.collisionSystem.registerCollisionCallback('player-obstacle', (collision) => {
             this.handlePlayerObstacleCollision(collision);
+        });
+        
+        // 注册子弹碰撞回调
+        this.collisionSystem.registerCollisionCallback('bullet-obstacle', (collision) => {
+            this.handleBulletObstacleCollision(collision);
+        });
+        
+        // 注册玩家射击回调
+        this.player.onShoot((shootInfo) => {
+            this.handlePlayerShoot(shootInfo);
         });
     }
     
@@ -66,6 +89,13 @@ class GameScene extends Scene {
         this.gameState = 'playing';
         this.gameTime = 0;
         
+        // 重置射击统计
+        this.shootingStats = {
+            shotsFired: 0,
+            shotsHit: 0,
+            maxCombo: 0
+        };
+        
         // 重置玩家位置到屏幕中间
         if (this.player) {
             this.player.x = GameConfig.PLAYER.CENTER_X - GameConfig.PLAYER.WIDTH / 2;
@@ -80,6 +110,16 @@ class GameScene extends Scene {
         // 清除所有障碍物
         if (this.obstacleManager) {
             this.obstacleManager.clearAllObstacles();
+        }
+        
+        // 清除所有子弹
+        if (this.bulletManager) {
+            this.bulletManager.clearAllBullets();
+        }
+        
+        // 清除所有效果
+        if (this.effectSystem) {
+            this.effectSystem.clearAllEffects();
         }
         
         // 重置得分
@@ -110,6 +150,11 @@ class GameScene extends Scene {
             this.obstacleManager.update(deltaTime);
         }
         
+        // 更新子弹管理器
+        if (this.bulletManager) {
+            this.bulletManager.update(deltaTime);
+        }
+        
         // 更新得分系统 - 基于时间而不是距离
         if (this.scoreSystem) {
             this.scoreSystem.update(deltaTime, {
@@ -123,8 +168,16 @@ class GameScene extends Scene {
             this.collisionSystem.update(deltaTime);
         }
         
+        // 更新效果系统
+        if (this.effectSystem) {
+            this.effectSystem.update(deltaTime);
+        }
+        
         // 检查碰撞和游戏结束条件
         this.checkGameEndConditions();
+        
+        // 检查子弹与障碍物碰撞
+        this.checkBulletCollisions();
     }
     
     /**
@@ -163,7 +216,114 @@ class GameScene extends Scene {
      */
     handlePlayerObstacleCollision(collision) {
         console.log('检测到碰撞:', collision);
+        
+        // 添加碰撞效果
+        if (this.effectSystem && this.player) {
+            const playerBounds = this.player.getBounds();
+            const centerX = playerBounds.x + playerBounds.width / 2;
+            const centerY = playerBounds.y + playerBounds.height / 2;
+            
+            // 创建摧毁效果（玩家碰撞）
+            this.effectSystem.addDestruction(centerX, centerY, {
+                particleCount: 10,
+                colors: ['#ff0000', '#ff4444', '#ff8888']
+            });
+        }
+        
         this.gameOver('collision');
+    }
+    
+    /**
+     * 处理子弹与障碍物碰撞
+     * @param {Object} collision - 碰撞信息
+     */
+    handleBulletObstacleCollision(collision) {
+        const { bullet, obstacle, damage } = collision;
+        
+        console.log('子弹击中障碍物:', collision);
+        
+        // 统计命中次数
+        this.shootingStats.shotsHit++;
+        
+        // 移除子弹
+        if (this.bulletManager) {
+            this.bulletManager.removeBullet(bullet);
+        }
+        
+        // 对障碍物造成伤害
+        const isDestroyed = obstacle.takeDamage();
+        
+        if (isDestroyed) {
+            // 障碍物被摧毁，从障碍物管理器中移除
+            if (this.obstacleManager) {
+                this.obstacleManager.removeObstacle(obstacle);
+            }
+            
+            // 使用新的射击得分系统添加得分奖励
+            let scoreBonus = 0;
+            if (this.scoreSystem) {
+                const obstacleType = obstacle.type || 'floating';
+                scoreBonus = this.scoreSystem.addShootingScore(obstacleType);
+                
+                // 更新最高连击记录
+                const currentCombo = this.scoreSystem.getComboCount();
+                if (currentCombo > this.shootingStats.maxCombo) {
+                    this.shootingStats.maxCombo = currentCombo;
+                }
+                
+                console.log(`获得射击得分奖励: ${scoreBonus} (类型: ${obstacleType}, 连击: ${currentCombo})`);
+            }
+            
+            // 添加爆炸效果
+            if (this.effectSystem) {
+                const obstacleBounds = obstacle.getBounds();
+                const centerX = obstacleBounds.x + obstacleBounds.width / 2;
+                const centerY = obstacleBounds.y + obstacleBounds.height / 2;
+                
+                // 创建爆炸效果
+                this.effectSystem.addExplosion(centerX, centerY);
+                
+                // 创建得分弹出效果，显示实际获得的得分
+                this.effectSystem.addScorePopup(centerX, centerY - 20, scoreBonus);
+            }
+        }
+    }
+    
+    /**
+     * 处理玩家射击
+     * @param {Object} shootInfo - 射击信息
+     */
+    handlePlayerShoot(shootInfo) {
+        if (this.bulletManager) {
+            const bullet = this.bulletManager.addBullet(
+                shootInfo.x,
+                shootInfo.y,
+                shootInfo.direction
+            );
+            
+            if (bullet) {
+                // 统计射击次数
+                this.shootingStats.shotsFired++;
+                console.log('创建子弹:', bullet);
+            } else {
+                console.warn('无法创建子弹，可能达到最大数量限制');
+            }
+        }
+    }
+    
+    /**
+     * 检查子弹与障碍物碰撞
+     */
+    checkBulletCollisions() {
+        if (!this.bulletManager || !this.obstacleManager || !this.collisionSystem) {
+            return;
+        }
+        
+        const bullets = this.bulletManager.getBullets();
+        const floatingObstacles = this.obstacleManager.getFloatingObstacles();
+        
+        // 使用碰撞系统检查子弹与漂浮障碍物的碰撞
+        this.collisionSystem.checkBulletObstacleCollisions(bullets, floatingObstacles);
     }
     
     /**
@@ -207,14 +367,15 @@ class GameScene extends Scene {
             score: this.scoreSystem?.getScore() || 0,
             time: this.gameTime,
             reason: reason,
-            isNewRecord: this.scoreSystem?.isNewHighScore() || false
+            isNewRecord: this.scoreSystem?.isNewHighScore() || false,
+            ...this.shootingStats
         };
         
         console.log('游戏统计:', stats);
         
         // 通知游戏引擎切换到游戏结束场景
-        if (this.onGameOver && typeof this.onGameOver === 'function') {
-            this.onGameOver(stats.score);
+        if (this.onGameOverCallback && typeof this.onGameOverCallback === 'function') {
+            this.onGameOverCallback(stats.score, stats);
         }
     }
     
@@ -238,6 +399,11 @@ class GameScene extends Scene {
         if (this.collisionSystem && GameConfig.DEBUG) {
             this.collisionSystem.renderDebugInfo(renderer);
         }
+        
+        // 渲染效果系统调试信息（如果启用调试模式）
+        if (this.effectSystem && GameConfig.DEBUG) {
+            this.effectSystem.renderDebugInfo(renderer);
+        }
     }
     
     /**
@@ -250,9 +416,19 @@ class GameScene extends Scene {
             this.obstacleManager.render(renderer);
         }
         
+        // 渲染子弹（在玩家和障碍物之间）
+        if (this.bulletManager) {
+            this.bulletManager.render(renderer);
+        }
+        
         // 渲染玩家（后渲染，在前面）
         if (this.player) {
             this.player.render(renderer);
+        }
+        
+        // 渲染效果（最后渲染，在所有实体前面）
+        if (this.effectSystem) {
+            this.effectSystem.render(renderer);
         }
     }
     
@@ -283,13 +459,36 @@ class GameScene extends Scene {
         // 渲染操作提示（仅在游戏进行时）
         if (this.gameState === 'playing') {
             renderer.drawTextWithStroke(
-                '空格键跳跃 | ESC暂停',
+                '空格键跳跃 | X键射击漂浮障碍物 | ESC暂停',
                 20,
                 20,
                 '#ffffff',
                 '#000000',
                 '14px Arial'
             );
+            
+            // 渲染射击得分提示
+            if (this.scoreSystem && this.scoreSystem.getComboCount() > 1) {
+                const comboCount = this.scoreSystem.getComboCount();
+                const comboMultiplier = this.scoreSystem.getComboMultiplier(comboCount);
+                renderer.drawTextWithStroke(
+                    `射击连击: ${comboCount}x (${comboMultiplier.toFixed(1)}倍得分)`,
+                    20,
+                    40,
+                    this.scoreSystem.getComboColor(comboCount),
+                    '#000000',
+                    '14px Arial'
+                );
+            } else {
+                renderer.drawTextWithStroke(
+                    '射击漂浮障碍物获得额外得分！',
+                    20,
+                    40,
+                    '#ffff88',
+                    '#000000',
+                    '12px Arial'
+                );
+            }
         }
     }
     
@@ -452,7 +651,7 @@ class GameScene extends Scene {
             }
             
             // 玩家射击
-            if (inputHandler.isShootKeyPressed() && this.player && this.player.canShootNow()) {
+            if ((inputHandler.isKeyJustPressed('KeyX') || inputHandler.isKeyJustPressed('ControlLeft')) && this.player && this.player.canShootNow()) {
                 this.player.shoot();
             }
             
@@ -556,17 +755,32 @@ class GameScene extends Scene {
     }
     
     /**
+     * 获取子弹管理器
+     * @returns {BulletManager} 子弹管理器
+     */
+    getBulletManager() {
+        return this.bulletManager;
+    }
+    
+    /**
      * 获取实体数量统计
      * @returns {Object} 实体数量信息
      */
     getEntityCounts() {
         const obstacles = this.obstacleManager ? this.obstacleManager.getObstacles() : [];
         const activeObstacles = obstacles.filter(obstacle => obstacle.active);
+        const bullets = this.bulletManager ? this.bulletManager.getBullets() : [];
+        const activeBullets = bullets.filter(bullet => bullet.active);
+        
+        const activeEffects = this.effectSystem ? this.effectSystem.getActiveEffectCount() : 0;
         
         return {
-            active: activeObstacles.length + (this.player ? 1 : 0),
-            total: obstacles.length + (this.player ? 1 : 0),
-            rendered: activeObstacles.length + (this.player ? 1 : 0)
+            active: activeObstacles.length + activeBullets.length + activeEffects + (this.player ? 1 : 0),
+            total: obstacles.length + bullets.length + activeEffects + (this.player ? 1 : 0),
+            rendered: activeObstacles.length + activeBullets.length + activeEffects + (this.player ? 1 : 0),
+            bullets: activeBullets.length,
+            obstacles: activeObstacles.length,
+            effects: activeEffects
         };
     }
     
@@ -591,6 +805,24 @@ class GameScene extends Scene {
             const inactiveObstacles = this.obstacleManager.obstacles.filter(o => !o.active);
             if (inactiveObstacles.length > maxInactiveObstacles) {
                 this.obstacleManager.obstacles = this.obstacleManager.obstacles.filter(o => o.active);
+            }
+        }
+        
+        // 清理子弹管理器的临时数据
+        if (this.bulletManager) {
+            // 强制清理过多的子弹
+            const maxBullets = 20;
+            if (this.bulletManager.bullets.length > maxBullets) {
+                this.bulletManager.forceCleanup();
+            }
+        }
+        
+        // 清理效果系统的临时数据
+        if (this.effectSystem) {
+            // 如果效果过多，清理一些旧效果
+            const maxEffects = 30;
+            if (this.effectSystem.getActiveEffectCount() > maxEffects) {
+                this.effectSystem.removeFinishedEffects();
             }
         }
     }

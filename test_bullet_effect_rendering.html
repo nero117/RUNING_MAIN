@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>子弹和效果渲染测试</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background-color: #222;
+            color: white;
+            font-family: Arial, sans-serif;
+        }
+        canvas {
+            border: 2px solid #444;
+            background-color: #87CEEB;
+        }
+        .controls {
+            margin-top: 10px;
+        }
+        button {
+            margin: 5px;
+            padding: 10px 15px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .info {
+            margin-top: 10px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <h1>子弹和效果渲染测试</h1>
+    <canvas id="gameCanvas" width="800" height="400"></canvas>
+    
+    <div class="controls">
+        <button onclick="testBulletRendering()">测试子弹渲染</button>
+        <button onclick="testEffectRendering()">测试效果渲染</button>
+        <button onclick="testFloatingObstacleRendering()">测试漂浮障碍物渲染</button>
+        <button onclick="testShootingScore()">测试射击得分</button>
+        <button onclick="clearAll()">清除所有</button>
+    </div>
+    
+    <div class="info">
+        <p>测试说明：</p>
+        <ul>
+            <li>子弹渲染：创建多个子弹，测试拖尾效果和渲染性能</li>
+            <li>效果渲染：创建爆炸和得分弹出效果</li>
+            <li>漂浮障碍物渲染：创建可射击的漂浮障碍物</li>
+            <li>射击得分：测试不同类型障碍物的得分奖励和连击机制</li>
+        </ul>
+    </div>
+
+    <!-- 加载游戏脚本 -->
+    <script src="js/config.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/objectPool.js"></script>
+    <script src="js/entities/entity.js"></script>
+    <script src="js/entities/bullet.js"></script>
+    <script src="js/entities/obstacle.js"></script>
+    <script src="js/managers/bulletManager.js"></script>
+    <script src="js/systems/effectSystem.js"></script>
+    <script src="js/systems/scoreSystem.js"></script>
+    <script src="js/renderer.js"></script>
+
+    <script>
+        // 测试变量
+        let canvas, renderer, bulletManager, effectSystem, scoreSystem;
+        let testBullets = [];
+        let testObstacles = [];
+        let animationId;
+
+        // 初始化测试环境
+        function initTest() {
+            canvas = document.getElementById('gameCanvas');
+            renderer = new Renderer(canvas);
+            bulletManager = new BulletManager();
+            effectSystem = new EffectSystem();
+            scoreSystem = new ScoreSystem();
+            
+            // 启动渲染循环
+            startRenderLoop();
+        }
+
+        // 渲染循环
+        function startRenderLoop() {
+            let lastTime = 0;
+            
+            function gameLoop(currentTime) {
+                const deltaTime = (currentTime - lastTime) / 1000;
+                lastTime = currentTime;
+                
+                // 更新
+                bulletManager.update(deltaTime);
+                effectSystem.update(deltaTime);
+                scoreSystem.update(deltaTime);
+                testObstacles.forEach(obstacle => obstacle.update(deltaTime));
+                
+                // 渲染
+                renderer.clear();
+                renderer.drawBackground();
+                
+                // 渲染测试障碍物
+                testObstacles.forEach(obstacle => obstacle.render(renderer));
+                
+                // 渲染子弹
+                bulletManager.render(renderer);
+                
+                // 渲染效果
+                effectSystem.render(renderer);
+                
+                // 渲染得分系统
+                scoreSystem.render(renderer);
+                
+                // 渲染调试信息
+                renderer.drawText(`子弹数量: ${bulletManager.getBullets().length}`, 10, 10, '#ffffff', '14px Arial');
+                renderer.drawText(`效果数量: ${effectSystem.getActiveEffectCount()}`, 10, 30, '#ffffff', '14px Arial');
+                renderer.drawText(`障碍物数量: ${testObstacles.length}`, 10, 50, '#ffffff', '14px Arial');
+                
+                animationId = requestAnimationFrame(gameLoop);
+            }
+            
+            animationId = requestAnimationFrame(gameLoop);
+        }
+
+        // 测试子弹渲染
+        function testBulletRendering() {
+            console.log('测试子弹渲染');
+            
+            // 创建多个子弹测试拖尾效果
+            for (let i = 0; i < 5; i++) {
+                const y = 100 + i * 30;
+                bulletManager.addBullet(50, y, 1);
+            }
+            
+            // 创建反向子弹
+            for (let i = 0; i < 3; i++) {
+                const y = 200 + i * 40;
+                bulletManager.addBullet(750, y, -1);
+            }
+        }
+
+        // 测试效果渲染
+        function testEffectRendering() {
+            console.log('测试效果渲染');
+            
+            // 创建爆炸效果
+            effectSystem.addExplosion(200, 150);
+            effectSystem.addExplosion(300, 200, { particleCount: 12, colors: ['#ff0000', '#ff4444', '#ff8888'] });
+            
+            // 创建摧毁效果
+            effectSystem.addDestruction(400, 180);
+            
+            // 创建粒子爆发效果
+            effectSystem.addParticleBurst(500, 160);
+            
+            // 创建得分弹出效果
+            effectSystem.addScorePopup(350, 120, 100);
+            effectSystem.addScorePopup(450, 140, 250);
+        }
+
+        // 测试漂浮障碍物渲染
+        function testFloatingObstacleRendering() {
+            console.log('测试漂浮障碍物渲染');
+            
+            // 创建普通漂浮障碍物
+            const floating1 = new Obstacle(600, 120, 'floating');
+            floating1.velocityX = -100; // 慢速移动以便观察
+            testObstacles.push(floating1);
+            
+            // 创建大型漂浮障碍物
+            const floating2 = new Obstacle(650, 200, 'floating_large');
+            floating2.velocityX = -80;
+            testObstacles.push(floating2);
+            
+            // 创建地面障碍物作为对比
+            const ground = new Obstacle(700, GameConfig.GROUND_Y, 'basic');
+            ground.velocityX = -120;
+            testObstacles.push(ground);
+        }
+
+        // 测试射击得分系统
+        function testShootingScore() {
+            console.log('测试射击得分系统');
+            
+            // 重置得分系统
+            scoreSystem.reset();
+            
+            // 测试不同类型障碍物的得分
+            const obstacleTypes = ['floating', 'floating_large', 'basic', 'tall', 'wide'];
+            
+            obstacleTypes.forEach((type, index) => {
+                setTimeout(() => {
+                    const score = scoreSystem.addShootingScore(type);
+                    console.log(`${type} 障碍物得分: ${score}, 连击: ${scoreSystem.getComboCount()}`);
+                    
+                    // 创建得分弹出效果
+                    effectSystem.addScorePopup(200 + index * 100, 100, score);
+                    
+                    // 创建爆炸效果
+                    effectSystem.addExplosion(200 + index * 100, 120);
+                }, index * 500); // 每0.5秒一个，测试连击
+            });
+            
+            // 测试连击过期
+            setTimeout(() => {
+                console.log('测试连击过期...');
+                setTimeout(() => {
+                    const score = scoreSystem.addShootingScore('floating');
+                    console.log(`连击过期后得分: ${score}, 连击: ${scoreSystem.getComboCount()}`);
+                    effectSystem.addScorePopup(400, 200, score);
+                }, 4000); // 4秒后，应该重置连击
+            }, 3000);
+        }
+
+        // 清除所有测试对象
+        function clearAll() {
+            console.log('清除所有测试对象');
+            bulletManager.clearAllBullets();
+            effectSystem.clearAllEffects();
+            testObstacles = [];
+            scoreSystem.reset();
+        }
+
+        // 页面加载完成后初始化
+        window.addEventListener('load', initTest);
+        
+        // 页面卸载时清理
+        window.addEventListener('beforeunload', () => {
+            if (animationId) {
+                cancelAnimationFrame(animationId);
+            }
+        });
+    </script>
+</body>
+</html>

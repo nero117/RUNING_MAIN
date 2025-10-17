@@ -205,6 +205,25 @@ class Renderer {
     }
     
     /**
+     * 绘制线条
+     * @param {number} x1 - 起始X坐标
+     * @param {number} y1 - 起始Y坐标
+     * @param {number} x2 - 结束X坐标
+     * @param {number} y2 - 结束Y坐标
+     * @param {string} color - 颜色
+     * @param {number} lineWidth - 线宽
+     */
+    drawLine(x1, y1, x2, y2, color = '#ffffff', lineWidth = 1) {
+        this.ctx.strokeStyle = color;
+        this.ctx.lineWidth = lineWidth;
+        this.ctx.beginPath();
+        this.ctx.moveTo(x1, y1);
+        this.ctx.lineTo(x2, y2);
+        this.ctx.stroke();
+        this.renderStats.drawCalls++;
+    }
+    
+    /**
      * 绘制文本
      * @param {string} text - 文本内容
      * @param {number} x - X坐标

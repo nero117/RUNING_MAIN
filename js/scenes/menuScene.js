@@ -241,7 +241,9 @@ class MenuScene extends Scene {
         const instructions = [
             '🏃 角色会自动向前奔跑',
             '⬆️ 按空格键让角色跳跃',
+            '🔫 按X键射击消除漂浮障碍物',
             '🚧 躲避路上的障碍物',
+            '🎯 射击漂浮障碍物获得额外得分',
             '🏆 坚持越久得分越高'
         ];
         
@@ -249,9 +251,9 @@ class MenuScene extends Scene {
             renderer.drawText(
                 instruction,
                 GameConfig.CANVAS_WIDTH / 2,
-                instructionY + 40 + (index * 25),
+                instructionY + 40 + (index * 22),
                 '#FFFFFF',
-                '18px Arial',
+                '16px Arial',
                 'center'
             );
         });

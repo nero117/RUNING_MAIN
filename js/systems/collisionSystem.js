@@ -38,6 +38,89 @@ class CollisionSystem {
     }
     
     /**
+     * 检查子弹与漂浮障碍物的碰撞
+     * @param {Bullet[]} bullets - 子弹数组
+     * @param {Obstacle[]} floatingObstacles - 漂浮障碍物数组
+     * @returns {Object[]} 碰撞信息数组
+     */
+    checkBulletObstacleCollisions(bullets, floatingObstacles) {
+        const collisions = [];
+        
+        if (!bullets || !floatingObstacles) return collisions;
+        
+        // 只检查活跃的子弹
+        const activeBullets = bullets.filter(bullet => bullet.active);
+        // 只检查可被射击的漂浮障碍物
+        const shootableObstacles = floatingObstacles.filter(obstacle => 
+            obstacle.active && obstacle.canBeShot
+        );
+        
+        for (const bullet of activeBullets) {
+            const bulletBounds = bullet.getBounds();
+            
+            for (const obstacle of shootableObstacles) {
+                const obstacleBounds = obstacle.getBounds();
+                
+                if (this.physicsSystem.checkRectangleCollision(bulletBounds, obstacleBounds)) {
+                    const collision = {
+                        bullet: bullet,
+                        obstacle: obstacle,
+                        collisionPoint: this.physicsSystem.getCollisionPoint(bulletBounds, obstacleBounds),
+                        damage: bullet.getDamage(),
+                        timestamp: performance.now()
+                    };
+                    
+                    collisions.push(collision);
+                    this.stats.collisionsDetected++;
+                    this.recordCollision(collision);
+                    this.triggerCollisionCallback('bullet-obstacle', collision);
+                    
+                    // 一个子弹只能击中一个障碍物
+                    break;
+                }
+            }
+        }
+        
+        return collisions;
+    }
+    
+    /**
+     * 检查单个子弹与障碍物的碰撞
+     * @param {Bullet} bullet - 子弹对象
+     * @param {Obstacle[]} obstacles - 障碍物数组
+     * @returns {Obstacle|null} 碰撞的障碍物或null
+     */
+    checkSingleBulletCollision(bullet, obstacles) {
+        if (!bullet || !bullet.active || !obstacles) return null;
+        
+        const bulletBounds = bullet.getBounds();
+        
+        for (const obstacle of obstacles) {
+            if (!obstacle.active || !obstacle.canBeShot) continue;
+            
+            const obstacleBounds = obstacle.getBounds();
+            
+            if (this.physicsSystem.checkRectangleCollision(bulletBounds, obstacleBounds)) {
+                const collision = {
+                    bullet: bullet,
+                    obstacle: obstacle,
+                    collisionPoint: this.physicsSystem.getCollisionPoint(bulletBounds, obstacleBounds),
+                    damage: bullet.getDamage(),
+                    timestamp: performance.now()
+                };
+                
+                this.stats.collisionsDetected++;
+                this.recordCollision(collision);
+                this.triggerCollisionCallback('bullet-obstacle', collision);
+                
+                return obstacle;
+            }
+        }
+        
+        return null;
+    }
+    
+    /**
      * 检查所有实体间的碰撞
      * @param {Entity[]} entities - 实体数组
      * @returns {Object[]} 碰撞信息数组

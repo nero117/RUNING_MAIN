@@ -36,7 +36,7 @@
     <div id="gameContainer">
         <canvas id="gameCanvas" width="800" height="400"></canvas>
         <div id="gameInfo">
-            <p>按空格键跳跃 | 得分: <span id="score">0</span></p>
+            <p>按空格键跳跃 | X键射击漂浮障碍物 | 射击连击获得额外得分 | 得分: <span id="score">0</span></p>
         </div>
     </div>
 
@@ -48,7 +48,9 @@
     <script src="js/entities/entity.js"></script>
     <script src="js/entities/player.js"></script>
     <script src="js/entities/obstacle.js"></script>
+    <script src="js/entities/bullet.js"></script>
     <script src="js/managers/obstacleManager.js"></script>
+    <script src="js/managers/bulletManager.js"></script>
     <script src="js/managers/sceneManager.js"></script>
     <script src="js/scenes/scene.js"></script>
     <script src="js/scenes/menuScene.js"></script>
@@ -56,6 +58,7 @@
     <script src="js/scenes/gameOverScene.js"></script>
     <script src="js/systems/scoreSystem.js"></script>
     <script src="js/systems/collisionSystem.js"></script>
+    <script src="js/systems/effectSystem.js"></script>
     <script src="js/renderer.js"></script>
     <script src="js/objectPool.js"></script>
     <script src="js/performanceMonitor.js"></script>

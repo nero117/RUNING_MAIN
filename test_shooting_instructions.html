@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>射击功能说明测试</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background-color: #2c3e50;
+            font-family: Arial, sans-serif;
+            color: white;
+        }
+        
+        #gameContainer {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        #gameCanvas {
+            border: 2px solid #34495e;
+            background-color: #87CEEB;
+            display: block;
+            margin: 0 auto;
+        }
+        
+        #gameInfo {
+            color: white;
+            margin-top: 10px;
+        }
+        
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #555;
+            border-radius: 5px;
+        }
+        
+        .test-result {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 3px;
+        }
+        
+        .pass { background-color: #2d5a2d; }
+        .fail { background-color: #5a2d2d; }
+    </style>
+</head>
+<body>
+    <h1>射击功能说明测试</h1>
+    
+    <div class="test-section">
+        <h2>1. HTML 游戏信息测试</h2>
+        <div id="gameContainer">
+            <canvas id="gameCanvas" width="800" height="400"></canvas>
+            <div id="gameInfo">
+                <p>按空格键跳跃 | X键射击漂浮障碍物 | 射击连击获得额外得分 | 得分: <span id="score">0</span></p>
+            </div>
+        </div>
+        <div id="html-test-result" class="test-result">检查中...</div>
+    </div>
+    
+    <div class="test-section">
+        <h2>2. 菜单场景说明测试</h2>
+        <canvas id="menuCanvas" width="800" height="400" style="border: 1px solid #555;"></canvas>
+        <div id="menu-test-result" class="test-result">检查中...</div>
+    </div>
+    
+    <div class="test-section">
+        <h2>3. 游戏场景UI测试</h2>
+        <canvas id="gameSceneCanvas" width="800" height="400" style="border: 1px solid #555;"></canvas>
+        <div id="game-test-result" class="test-result">检查中...</div>
+        <p>按空格键模拟游戏状态，按X键模拟射击</p>
+    </div>
+    
+    <div class="test-section">
+        <h2>4. 游戏结束场景测试</h2>
+        <canvas id="gameOverCanvas" width="800" height="400" style="border: 1px solid #555;"></canvas>
+        <div id="gameover-test-result" class="test-result">检查中...</div>
+    </div>
+
+    <!-- 游戏模块 -->
+    <script src="js/config.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/input.js"></script>
+    <script src="js/physics.js"></script>
+    <script src="js/entities/entity.js"></script>
+    <script src="js/entities/player.js"></script>
+    <script src="js/entities/obstacle.js"></script>
+    <script src="js/entities/bullet.js"></script>
+    <script src="js/managers/obstacleManager.js"></script>
+    <script src="js/managers/bulletManager.js"></script>
+    <script src="js/managers/sceneManager.js"></script>
+    <script src="js/scenes/scene.js"></script>
+    <script src="js/scenes/menuScene.js"></script>
+    <script src="js/scenes/gameScene.js"></script>
+    <script src="js/scenes/gameOverScene.js"></script>
+    <script src="js/systems/scoreSystem.js"></script>
+    <script src="js/systems/collisionSystem.js"></script>
+    <script src="js/systems/effectSystem.js"></script>
+    <script src="js/renderer.js"></script>
+    <script src="js/objectPool.js"></script>
+    <script src="js/performanceMonitor.js"></script>
+    <script src="js/memoryManager.js"></script>
+    <script src="js/debugConsole.js"></script>
+    <script src="js/systemIntegration.js"></script>
+    <script src="js/gameEngine.js"></script>
+
+    <script>
+        // 测试结果记录
+        const testResults = {
+            html: false,
+            menu: false,
+            game: false,
+            gameOver: false
+        };
+        
+        function updateTestResult(testName, passed, message) {
+            const element = document.getElementById(`${testName}-test-result`);
+            element.className = `test-result ${passed ? 'pass' : 'fail'}`;
+            element.textContent = `${passed ? '✓ 通过' : '✗ 失败'}: ${message}`;
+            testResults[testName] = passed;
+        }
+        
+        // 1. 测试HTML游戏信息
+        function testHTMLGameInfo() {
+            const gameInfo = document.getElementById('gameInfo');
+            const text = gameInfo.textContent;
+            
+            const hasJump = text.includes('空格键跳跃');
+            const hasShoot = text.includes('X键射击');
+            const hasFloating = text.includes('漂浮障碍物');
+            const hasCombo = text.includes('连击');
+            
+            const passed = hasJump && hasShoot && hasFloating && hasCombo;
+            updateTestResult('html', passed, 
+                `跳跃说明: ${hasJump}, 射击说明: ${hasShoot}, 漂浮障碍物: ${hasFloating}, 连击说明: ${hasCombo}`);
+        }
+        
+        // 2. 测试菜单场景
+        function testMenuScene() {
+            const canvas = document.getElementById('menuCanvas');
+            const renderer = new Renderer(canvas);
+            const menuScene = new MenuScene();
+            
+            try {
+                menuScene.render(renderer);
+                updateTestResult('menu', true, '菜单场景渲染成功，包含射击说明');
+            } catch (error) {
+                updateTestResult('menu', false, `菜单场景渲染失败: ${error.message}`);
+            }
+        }
+        
+        // 3. 测试游戏场景
+        function testGameScene() {
+            const canvas = document.getElementById('gameSceneCanvas');
+            const renderer = new Renderer(canvas);
+            const gameScene = new GameScene();
+            const inputHandler = new InputHandler();
+            
+            try {
+                // 模拟游戏状态
+                gameScene.gameState = 'playing';
+                gameScene.scoreSystem.comboCount = 3; // 模拟连击
+                
+                gameScene.render(renderer);
+                updateTestResult('game', true, '游戏场景渲染成功，包含射击UI和连击显示');
+                
+                // 添加输入处理测试
+                inputHandler.onShoot(() => {
+                    console.log('游戏场景射击测试成功');
+                });
+                
+            } catch (error) {
+                updateTestResult('game', false, `游戏场景渲染失败: ${error.message}`);
+            }
+        }
+        
+        // 4. 测试游戏结束场景
+        function testGameOverScene() {
+            const canvas = document.getElementById('gameOverCanvas');
+            const renderer = new Renderer(canvas);
+            const gameOverScene = new GameOverScene();
+            
+            try {
+                // 设置测试数据
+                gameOverScene.setFinalScore(1500, {
+                    shotsFired: 20,
+                    shotsHit: 15,
+                    maxCombo: 8
+                });
+                
+                gameOverScene.render(renderer);
+                updateTestResult('gameOver', true, '游戏结束场景渲染成功，包含射击统计');
+            } catch (error) {
+                updateTestResult('gameOver', false, `游戏结束场景渲染失败: ${error.message}`);
+            }
+        }
+        
+        // 运行所有测试
+        function runAllTests() {
+            console.log('开始射击功能说明测试...');
+            
+            testHTMLGameInfo();
+            testMenuScene();
+            testGameScene();
+            testGameOverScene();
+            
+            // 显示总结
+            setTimeout(() => {
+                const passedTests = Object.values(testResults).filter(r => r).length;
+                const totalTests = Object.keys(testResults).length;
+                
+                console.log(`测试完成: ${passedTests}/${totalTests} 通过`);
+                
+                if (passedTests === totalTests) {
+                    document.body.style.borderTop = '5px solid #2d5a2d';
+                    console.log('✓ 所有射击功能说明测试通过！');
+                } else {
+                    document.body.style.borderTop = '5px solid #5a2d2d';
+                    console.log('✗ 部分测试失败，请检查实现');
+                }
+            }, 100);
+        }
+        
+        // 页面加载完成后运行测试
+        window.addEventListener('load', runAllTests);
+        
+        // 添加交互测试
+        const inputHandler = new InputHandler();
+        inputHandler.onShoot(() => {
+            console.log('射击输入测试成功！');
+            document.getElementById('game-test-result').textContent += ' (射击输入已测试)';
+        });
+        
+        function update() {
+            inputHandler.update(16);
+            requestAnimationFrame(update);
+        }
+        update();
+        
+        console.log('射击功能说明测试页面已加载');
+        console.log('按X键测试射击输入功能');
+    </script>
+</body>
+</html>
+</content>

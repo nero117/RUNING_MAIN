@@ -17,10 +17,12 @@ class GameOverScene extends Scene {
     /**
      * 设置最终得分
      * @param {number} score - 最终得分
+     * @param {Object} gameStats - 游戏统计数据
      */
-    setFinalScore(score) {
+    setFinalScore(score, gameStats = {}) {
         this.finalScore = score;
         this.scoreCountUp = 0;
+        this.gameStats = gameStats;
         
         // 检查是否是新纪录
         this.bestScore = this.getBestScore();
@@ -240,6 +242,30 @@ class GameOverScene extends Scene {
             '24px Arial',
             'center'
         );
+        
+        // 绘制射击统计信息（如果有）
+        if (this.gameStats && this.gameStats.maxCombo > 1) {
+            renderer.drawText(
+                `最高连击: ${this.gameStats.maxCombo}x`,
+                GameConfig.CANVAS_WIDTH / 2,
+                scoreY + 65,
+                '#FF8C00',
+                '18px Arial',
+                'center'
+            );
+        }
+        
+        if (this.gameStats && this.gameStats.shotsHit > 0) {
+            const accuracy = ((this.gameStats.shotsHit / this.gameStats.shotsFired) * 100).toFixed(1);
+            renderer.drawText(
+                `射击命中率: ${accuracy}% (${this.gameStats.shotsHit}/${this.gameStats.shotsFired})`,
+                GameConfig.CANVAS_WIDTH / 2,
+                scoreY + 85,
+                '#87CEEB',
+                '16px Arial',
+                'center'
+            );
+        }
     }
     
     /**
@@ -342,12 +368,23 @@ class GameOverScene extends Scene {
     drawMenuOption(renderer) {
         const menuY = GameConfig.CANVAS_HEIGHT / 2 + 140;
         
+        // 绘制操作提示
         renderer.drawText(
             '按 [ESC] 返回主菜单',
             GameConfig.CANVAS_WIDTH / 2,
             menuY,
             'rgba(255, 255, 255, 0.8)',
             '18px Arial',
+            'center'
+        );
+        
+        // 绘制射击功能提示
+        renderer.drawText(
+            '提示：使用X键射击漂浮障碍物获得额外得分和连击奖励！',
+            GameConfig.CANVAS_WIDTH / 2,
+            menuY + 25,
+            'rgba(255, 255, 136, 0.9)',
+            '14px Arial',
             'center'
         );
     }

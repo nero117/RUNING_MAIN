@@ -145,9 +145,9 @@ class GameEngine {
             this.sceneManager.switchScene('menu');
         };
         
-        gameScene.onGameOver = (finalScore) => {
-            // 传递最终得分到游戏结束场景
-            gameOverScene.setFinalScore(finalScore);
+        gameScene.onGameOverCallback = (finalScore, gameStats) => {
+            // 传递最终得分和游戏统计到游戏结束场景
+            gameOverScene.setFinalScore(finalScore, gameStats);
             this.sceneManager.switchScene('gameOver');
         };
         
