@@ -55,7 +55,7 @@
         <div id="gameContainer">
             <canvas id="gameCanvas" width="800" height="400"></canvas>
             <div id="gameInfo">
-                <p>按空格键跳跃 | X键射击漂浮障碍物 | 射击连击获得额外得分 | 得分: <span id="score">0</span></p>
+                <p>按空格键跳跃 | Q键射击漂浮障碍物 | 射击连击获得额外得分 | 得分: <span id="score">0</span></p>
             </div>
         </div>
         <div id="html-test-result" class="test-result">检查中...</div>
@@ -71,7 +71,7 @@
         <h2>3. 游戏场景UI测试</h2>
         <canvas id="gameSceneCanvas" width="800" height="400" style="border: 1px solid #555;"></canvas>
         <div id="game-test-result" class="test-result">检查中...</div>
-        <p>按空格键模拟游戏状态，按X键模拟射击</p>
+        <p>按空格键模拟游戏状态，按Q键模拟射击</p>
     </div>
     
     <div class="test-section">
@@ -129,7 +129,7 @@
             const text = gameInfo.textContent;
             
             const hasJump = text.includes('空格键跳跃');
-            const hasShoot = text.includes('X键射击');
+            const hasShoot = text.includes('Q键射击');
             const hasFloating = text.includes('漂浮障碍物');
             const hasCombo = text.includes('连击');
             
@@ -241,7 +241,7 @@
         update();
         
         console.log('射击功能说明测试页面已加载');
-        console.log('按X键测试射击输入功能');
+        console.log('按Q键测试射击输入功能');
     </script>
 </body>
 </html>

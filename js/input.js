@@ -12,9 +12,7 @@ class InputHandler {
             'Enter': 13,
             'Escape': 27,
             'KeyR': 82,
-            'KeyX': 88,      // X键用于射击
-            'ControlLeft': 17, // Ctrl键用于射击
-            'ControlRight': 17
+            'KeyQ': 81       // Q键用于射击
         };
         
         // 射击相关状态
@@ -33,8 +31,8 @@ class InputHandler {
             this.keys[event.keyCode] = true;
             this.keyStates[event.keyCode] = true;
             
-            // 处理射击输入（X键或Ctrl键）
-            if (event.keyCode === 88 || event.keyCode === 17) { // X键或Ctrl键
+            // 处理射击输入（Q键）
+            if (event.keyCode === 81) { // Q键
                 this.handleShootInput();
             }
             
@@ -43,8 +41,8 @@ class InputHandler {
                 this.callbacks[event.keyCode].forEach(callback => callback());
             }
             
-            // 阻止默认行为（如空格键滚动页面，Ctrl键的浏览器快捷键）
-            if (event.keyCode === 32 || event.keyCode === 17 || event.keyCode === 88) {
+            // 阻止默认行为（如空格键滚动页面）
+            if (event.keyCode === 32 || event.keyCode === 81) {
                 event.preventDefault();
             }
         });
@@ -153,7 +151,7 @@ class InputHandler {
      * @returns {boolean} 射击键是否被按下
      */
     isShootKeyPressed() {
-        return this.isKeyPressed(88) || this.isKeyPressed(17); // X键或Ctrl键
+        return this.isKeyPressed(81); // Q键
     }
     
     /**

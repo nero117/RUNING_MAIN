@@ -539,7 +539,7 @@ class GameScene extends Scene {
         // 渲染操作提示（仅在游戏进行时）
         if (this.gameState === 'playing') {
             renderer.drawTextWithStroke(
-                '空格键跳跃 | X键射击漂浮障碍物 | ESC暂停',
+                '空格键跳跃 | Q键射击漂浮障碍物 | ESC暂停',
                 20,
                 20,
                 '#ffffff',
@@ -733,8 +733,8 @@ class GameScene extends Scene {
                 this.player.jump();
             }
             
-            // 玩家射击 - 使用输入处理器的射击检测
-            if ((inputHandler.isKeyJustPressed('KeyX') || inputHandler.isKeyJustPressed('ControlLeft')) && this.player && this.player.canShootNow()) {
+            // 玩家射击 - 使用Q键射击
+            if (inputHandler.isKeyJustPressed('KeyQ') && this.player && this.player.canShootNow()) {
                 this.player.shoot();
             }
             

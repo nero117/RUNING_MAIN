@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Q键射击测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #2c3e50;
+            color: white;
+        }
+        .test-container {
+            background: #34495e;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .success { background-color: #27ae60; }
+        .info { background-color: #3498db; }
+        #shoot-indicator {
+            font-size: 24px;
+            text-align: center;
+            padding: 20px;
+            border: 2px solid #e74c3c;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎯 Q键射击功能测试</h1>
+    
+    <div class="test-container">
+        <h2>测试说明</h2>
+        <p>按 <strong>Q键</strong> 来测试射击功能</p>
+        <p>射击冷却时间：300毫秒</p>
+    </div>
+    
+    <div id="shoot-indicator">
+        准备射击... 按Q键！
+    </div>
+    
+    <div class="test-container">
+        <h2>测试结果</h2>
+        <div id="test-results"></div>
+    </div>
+    
+    <div class="test-container">
+        <h2>射击统计</h2>
+        <p>总射击次数: <span id="shot-count">0</span></p>
+        <p>最后射击时间: <span id="last-shot">未射击</span></p>
+        <p>冷却剩余: <span id="cooldown">0ms</span></p>
+    </div>
+    
+    <script src="js/config.js"></script>
+    <script src="js/input.js"></script>
+    
+    <script>
+        let shotCount = 0;
+        let lastShotTime = 0;
+        
+        const inputHandler = new InputHandler();
+        const indicator = document.getElementById('shoot-indicator');
+        const results = document.getElementById('test-results');
+        
+        // 注册射击回调
+        inputHandler.onShoot(() => {
+            shotCount++;
+            lastShotTime = Date.now();
+            
+            // 更新指示器
+            indicator.textContent = '🔥 射击成功！';
+            indicator.style.backgroundColor = '#27ae60';
+            
+            // 添加测试结果
+            const result = document.createElement('div');
+            result.className = 'status success';
+            result.textContent = `✅ 第${shotCount}次射击成功 - ${new Date().toLocaleTimeString()}`;
+            results.appendChild(result);
+            
+            // 更新统计
+            updateStats();
+            
+            // 重置指示器
+            setTimeout(() => {
+                indicator.textContent = '准备射击... 按Q键！';
+                indicator.style.backgroundColor = 'transparent';
+            }, 500);
+            
+            console.log(`射击成功！总计: ${shotCount}次`);
+        });
+        
+        // 更新统计信息
+        function updateStats() {
+            document.getElementById('shot-count').textContent = shotCount;
+            document.getElementById('last-shot').textContent = 
+                lastShotTime > 0 ? new Date(lastShotTime).toLocaleTimeString() : '未射击';
+        }
+        
+        // 更新冷却时间显示
+        function updateCooldown() {
+            const remaining = inputHandler.getShootCooldownRemaining();
+            document.getElementById('cooldown').textContent = remaining + 'ms';
+            
+            if (remaining > 0) {
+                indicator.style.opacity = '0.5';
+            } else {
+                indicator.style.opacity = '1.0';
+            }
+        }
+        
+        // 游戏循环
+        function gameLoop() {
+            inputHandler.update(16); // ~60fps
+            updateCooldown();
+            requestAnimationFrame(gameLoop);
+        }
+        
+        // 启动
+        gameLoop();
+        updateStats();
+        
+        // 添加键盘事件监听器来显示按键
+        document.addEventListener('keydown', (event) => {
+            if (event.code === 'KeyQ') {
+                const result = document.createElement('div');
+                result.className = 'status info';
+                result.textContent = `ℹ️ 检测到Q键按下 - ${new Date().toLocaleTimeString()}`;
+                results.appendChild(result);
+            }
+        });
+        
+        console.log('Q键射击测试已准备就绪');
+        console.log('按Q键进行射击测试');
+        
+        // 初始化测试结果
+        const initResult = document.createElement('div');
+        initResult.className = 'status info';
+        initResult.textContent = '🚀 测试初始化完成，等待Q键输入...';
+        results.appendChild(initResult);
+    </script>
+</body>
+</html>
