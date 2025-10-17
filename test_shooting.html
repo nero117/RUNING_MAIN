@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Shooting Test</title>
+</head>
+<body>
+    <div>Press X or Ctrl to test shooting (check console)</div>
+    <div id="status">Ready to test...</div>
+    
+    <script src="js/config.js"></script>
+    <script src="js/input.js"></script>
+    
+    <script>
+        const inputHandler = new InputHandler();
+        const statusDiv = document.getElementById('status');
+        
+        // Register shooting callback
+        inputHandler.onShoot(() => {
+            console.log('Shoot triggered!');
+            statusDiv.innerHTML = `Shot fired! Cooldown: ${inputHandler.getShootCooldownRemaining()}ms`;
+            
+            setTimeout(() => {
+                statusDiv.innerHTML = 'Ready to test...';
+            }, 1000);
+        });
+        
+        // Update loop for cooldown
+        function update() {
+            inputHandler.update(16); // ~60fps
+            requestAnimationFrame(update);
+        }
+        update();
+        
+        console.log('Shooting test ready. Press X or Ctrl to shoot.');
+    </script>
+</body>
+</html>
