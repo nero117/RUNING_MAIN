@@ -61,6 +61,41 @@ class GameScene extends Scene {
         this.player.onShoot((shootInfo) => {
             this.handlePlayerShoot(shootInfo);
         });
+        
+        // 验证射击系统集成
+        this.verifyShootingSystemIntegration();
+        
+        // 暴露测试函数到全局作用域（仅在调试模式下）
+        if (GameConfig.DEBUG) {
+            window.testShooting = () => this.testShootingSystemIntegration();
+        }
+        
+        console.log('射击功能已集成到游戏循环');
+    }
+    
+    /**
+     * 验证射击系统集成
+     */
+    verifyShootingSystemIntegration() {
+        const integrationChecks = {
+            player: !!this.player,
+            bulletManager: !!this.bulletManager,
+            collisionSystem: !!this.collisionSystem,
+            effectSystem: !!this.effectSystem,
+            playerShootCallback: this.player && this.player.shootCallbacks && this.player.shootCallbacks.length > 0,
+            bulletCollisionCallback: this.collisionSystem && this.collisionSystem.collisionCallbacks.has('bullet-obstacle'),
+            playerCollisionCallback: this.collisionSystem && this.collisionSystem.collisionCallbacks.has('player-obstacle')
+        };
+        
+        const allSystemsReady = Object.values(integrationChecks).every(check => check === true);
+        
+        if (allSystemsReady) {
+            console.log('✅ 射击系统集成验证通过 - 所有系统已正确连接');
+        } else {
+            console.warn('⚠️ 射击系统集成验证失败:', integrationChecks);
+        }
+        
+        return allSystemsReady;
     }
     
     /**
@@ -173,6 +208,11 @@ class GameScene extends Scene {
             this.effectSystem.update(deltaTime);
         }
         
+        // 记录射击统计到性能监控器
+        if (window.shootingPerformanceMonitor) {
+            window.shootingPerformanceMonitor.recordShootingMetrics(this.shootingStats);
+        }
+        
         // 检查碰撞和游戏结束条件
         this.checkGameEndConditions();
         
@@ -240,7 +280,12 @@ class GameScene extends Scene {
     handleBulletObstacleCollision(collision) {
         const { bullet, obstacle, damage } = collision;
         
-        console.log('子弹击中障碍物:', collision);
+        console.log('🎯 子弹击中障碍物:', {
+            bulletPos: `(${Math.round(bullet.x)}, ${Math.round(bullet.y)})`,
+            obstaclePos: `(${Math.round(obstacle.x)}, ${Math.round(obstacle.y)})`,
+            obstacleType: obstacle.type,
+            damage: damage
+        });
         
         // 统计命中次数
         this.shootingStats.shotsHit++;
@@ -248,12 +293,15 @@ class GameScene extends Scene {
         // 移除子弹
         if (this.bulletManager) {
             this.bulletManager.removeBullet(bullet);
+            console.log('子弹已移除，剩余子弹数量:', this.bulletManager.getBullets().length);
         }
         
         // 对障碍物造成伤害
         const isDestroyed = obstacle.takeDamage();
         
         if (isDestroyed) {
+            console.log('💥 障碍物被摧毁');
+            
             // 障碍物被摧毁，从障碍物管理器中移除
             if (this.obstacleManager) {
                 this.obstacleManager.removeObstacle(obstacle);
@@ -271,7 +319,7 @@ class GameScene extends Scene {
                     this.shootingStats.maxCombo = currentCombo;
                 }
                 
-                console.log(`获得射击得分奖励: ${scoreBonus} (类型: ${obstacleType}, 连击: ${currentCombo})`);
+                console.log(`🏆 获得射击得分奖励: ${scoreBonus} (类型: ${obstacleType}, 连击: ${currentCombo})`);
             }
             
             // 添加爆炸效果
@@ -282,10 +330,14 @@ class GameScene extends Scene {
                 
                 // 创建爆炸效果
                 this.effectSystem.addExplosion(centerX, centerY);
+                console.log('💥 爆炸效果已创建');
                 
                 // 创建得分弹出效果，显示实际获得的得分
                 this.effectSystem.addScorePopup(centerX, centerY - 20, scoreBonus);
+                console.log('📈 得分弹出效果已创建');
             }
+        } else {
+            console.log('障碍物受到伤害但未被摧毁');
         }
     }
     
@@ -304,10 +356,21 @@ class GameScene extends Scene {
             if (bullet) {
                 // 统计射击次数
                 this.shootingStats.shotsFired++;
-                console.log('创建子弹:', bullet);
+                console.log('🔫 玩家射击 - 子弹已创建:', {
+                    position: `(${shootInfo.x}, ${shootInfo.y})`,
+                    direction: shootInfo.direction,
+                    bulletId: bullet.id || 'unknown',
+                    totalShots: this.shootingStats.shotsFired
+                });
+                
+                // 验证子弹是否正确添加到管理器
+                const activeBullets = this.bulletManager.getBullets();
+                console.log(`当前活跃子弹数量: ${activeBullets.length}`);
             } else {
-                console.warn('无法创建子弹，可能达到最大数量限制');
+                console.warn('⚠️ 无法创建子弹，可能达到最大数量限制');
             }
+        } else {
+            console.error('❌ BulletManager 未初始化，无法创建子弹');
         }
     }
     
@@ -316,14 +379,26 @@ class GameScene extends Scene {
      */
     checkBulletCollisions() {
         if (!this.bulletManager || !this.obstacleManager || !this.collisionSystem) {
+            if (GameConfig.DEBUG) {
+                console.warn('碰撞检查跳过 - 缺少必要的管理器');
+            }
             return;
         }
         
         const bullets = this.bulletManager.getBullets();
         const floatingObstacles = this.obstacleManager.getFloatingObstacles();
         
+        // 调试信息
+        if (GameConfig.DEBUG && (bullets.length > 0 || floatingObstacles.length > 0)) {
+            console.log(`🔍 碰撞检查: ${bullets.length} 子弹 vs ${floatingObstacles.length} 漂浮障碍物`);
+        }
+        
         // 使用碰撞系统检查子弹与漂浮障碍物的碰撞
-        this.collisionSystem.checkBulletObstacleCollisions(bullets, floatingObstacles);
+        const collisions = this.collisionSystem.checkBulletObstacleCollisions(bullets, floatingObstacles);
+        
+        if (GameConfig.DEBUG && collisions.length > 0) {
+            console.log(`💥 检测到 ${collisions.length} 个碰撞`);
+        }
     }
     
     /**
@@ -403,6 +478,11 @@ class GameScene extends Scene {
         // 渲染效果系统调试信息（如果启用调试模式）
         if (this.effectSystem && GameConfig.DEBUG) {
             this.effectSystem.renderDebugInfo(renderer);
+        }
+        
+        // 渲染射击性能监控信息（如果启用调试模式）
+        if (window.shootingPerformanceMonitor && GameConfig.DEBUG) {
+            window.shootingPerformanceMonitor.render(renderer);
         }
     }
     
@@ -645,12 +725,15 @@ class GameScene extends Scene {
      */
     handleInput(inputHandler) {
         if (this.gameState === 'playing') {
+            // 更新输入处理器的射击冷却时间
+            inputHandler.update(16.67); // 假设60FPS，约16.67ms每帧
+            
             // 玩家跳跃
             if (inputHandler.isKeyPressed('Space') && this.player) {
                 this.player.jump();
             }
             
-            // 玩家射击
+            // 玩家射击 - 使用输入处理器的射击检测
             if ((inputHandler.isKeyJustPressed('KeyX') || inputHandler.isKeyJustPressed('ControlLeft')) && this.player && this.player.canShootNow()) {
                 this.player.shoot();
             }
@@ -782,6 +865,63 @@ class GameScene extends Scene {
             obstacles: activeObstacles.length,
             effects: activeEffects
         };
+    }
+    
+    /**
+     * 测试射击系统集成（调试用）
+     */
+    testShootingSystemIntegration() {
+        console.log('🧪 开始射击系统集成测试...');
+        
+        // 测试1: 验证所有系统存在
+        const systems = {
+            player: this.player,
+            bulletManager: this.bulletManager,
+            obstacleManager: this.obstacleManager,
+            collisionSystem: this.collisionSystem,
+            effectSystem: this.effectSystem
+        };
+        
+        for (const [name, system] of Object.entries(systems)) {
+            if (!system) {
+                console.error(`❌ ${name} 系统未初始化`);
+                return false;
+            }
+        }
+        console.log('✅ 所有系统已初始化');
+        
+        // 测试2: 模拟射击
+        if (this.player.canShootNow()) {
+            const shootInfo = this.player.getShootPosition();
+            console.log('🎯 模拟射击:', shootInfo);
+            
+            const initialBulletCount = this.bulletManager.getBullets().length;
+            this.handlePlayerShoot(shootInfo);
+            const finalBulletCount = this.bulletManager.getBullets().length;
+            
+            if (finalBulletCount > initialBulletCount) {
+                console.log('✅ 子弹创建成功');
+            } else {
+                console.error('❌ 子弹创建失败');
+                return false;
+            }
+        } else {
+            console.log('⏳ 玩家当前无法射击（冷却中）');
+        }
+        
+        // 测试3: 验证碰撞回调
+        const hasPlayerCallback = this.collisionSystem.collisionCallbacks.has('player-obstacle');
+        const hasBulletCallback = this.collisionSystem.collisionCallbacks.has('bullet-obstacle');
+        
+        if (hasPlayerCallback && hasBulletCallback) {
+            console.log('✅ 碰撞回调已注册');
+        } else {
+            console.error('❌ 碰撞回调缺失:', { hasPlayerCallback, hasBulletCallback });
+            return false;
+        }
+        
+        console.log('🎉 射击系统集成测试通过！');
+        return true;
     }
     
     /**

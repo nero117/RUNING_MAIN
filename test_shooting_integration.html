@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Shooting System Integration Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f0f0f0;
+        }
+        .test-container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .success { background-color: #d4edda; color: #155724; }
+        .error { background-color: #f8d7da; color: #721c24; }
+        .info { background-color: #d1ecf1; color: #0c5460; }
+        .warning { background-color: #fff3cd; color: #856404; }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background-color: #0056b3; }
+        #console-output {
+            background-color: #000;
+            color: #00ff00;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            height: 200px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎯 Shooting System Integration Test</h1>
+    
+    <div class="test-container">
+        <h2>Test Controls</h2>
+        <button onclick="runBasicTests()">Run Basic Tests</button>
+        <button onclick="runInputTests()">Test Input System</button>
+        <button onclick="runCollisionTests()">Test Collision System</button>
+        <button onclick="runFullIntegrationTest()">Full Integration Test</button>
+        <button onclick="clearConsole()">Clear Console</button>
+    </div>
+    
+    <div class="test-container">
+        <h2>Test Results</h2>
+        <div id="test-results"></div>
+    </div>
+    
+    <div class="test-container">
+        <h2>Console Output</h2>
+        <div id="console-output"></div>
+    </div>
+    
+    <!-- Load all necessary scripts -->
+    <script src="js/config.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/objectPool.js"></script>
+    <script src="js/memoryManager.js"></script>
+    <script src="js/performanceMonitor.js"></script>
+    <script src="js/systemIntegration.js"></script>
+    <script src="js/input.js"></script>
+    <script src="js/physics.js"></script>
+    <script src="js/entities/entity.js"></script>
+    <script src="js/entities/player.js"></script>
+    <script src="js/entities/bullet.js"></script>
+    <script src="js/entities/obstacle.js"></script>
+    <script src="js/managers/bulletManager.js"></script>
+    <script src="js/managers/obstacleManager.js"></script>
+    <script src="js/systems/collisionSystem.js"></script>
+    <script src="js/systems/effectSystem.js"></script>
+    <script src="js/systems/scoreSystem.js"></script>
+    
+    <script>
+        // Console output capture
+        const consoleOutput = document.getElementById('console-output');
+        const testResults = document.getElementById('test-results');
+        
+        const originalConsoleLog = console.log;
+        const originalConsoleError = console.error;
+        const originalConsoleWarn = console.warn;
+        
+        function logToOutput(message, type = 'log') {
+            const timestamp = new Date().toLocaleTimeString();
+            const prefix = type === 'error' ? '❌' : type === 'warn' ? '⚠️' : '📝';
+            consoleOutput.textContent += `[${timestamp}] ${prefix} ${message}\n`;
+            consoleOutput.scrollTop = consoleOutput.scrollHeight;
+        }
+        
+        console.log = function(...args) {
+            originalConsoleLog.apply(console, args);
+            logToOutput(args.join(' '), 'log');
+        };
+        
+        console.error = function(...args) {
+            originalConsoleError.apply(console, args);
+            logToOutput(args.join(' '), 'error');
+        };
+        
+        console.warn = function(...args) {
+            originalConsoleWarn.apply(console, args);
+            logToOutput(args.join(' '), 'warn');
+        };
+        
+        function addTestResult(message, success) {
+            const div = document.createElement('div');
+            div.className = `status ${success ? 'success' : 'error'}`;
+            div.textContent = message;
+            testResults.appendChild(div);
+        }
+        
+        function clearConsole() {
+            consoleOutput.textContent = '';
+            testResults.innerHTML = '';
+        }
+        
+        // Test functions
+        function runBasicTests() {
+            console.log('🧪 Running Basic System Tests...');
+            
+            try {
+                // Test 1: Check if all classes are available
+                const classes = [
+                    'InputHandler', 'Player', 'Bullet', 'BulletManager', 
+                    'CollisionSystem', 'EffectSystem', 'Obstacle', 'ObstacleManager'
+                ];
+                
+                for (const className of classes) {
+                    if (typeof window[className] === 'undefined') {
+                        throw new Error(`${className} class not found`);
+                    }
+                }
+                addTestResult('✅ All required classes are available', true);
+                
+                // Test 2: Create instances
+                const inputHandler = new InputHandler();
+                const player = new Player(100, 100);
+                const bulletManager = new BulletManager();
+                const collisionSystem = new CollisionSystem();
+                const effectSystem = new EffectSystem();
+                
+                addTestResult('✅ All systems can be instantiated', true);
+                
+                // Test 3: Check player shooting capability
+                if (typeof player.shoot === 'function' && typeof player.canShootNow === 'function') {
+                    addTestResult('✅ Player has shooting methods', true);
+                } else {
+                    throw new Error('Player missing shooting methods');
+                }
+                
+                console.log('✅ Basic tests completed successfully');
+                
+            } catch (error) {
+                console.error('❌ Basic test failed:', error.message);
+                addTestResult(`❌ Basic test failed: ${error.message}`, false);
+            }
+        }
+        
+        function runInputTests() {
+            console.log('🎮 Running Input System Tests...');
+            
+            try {
+                const inputHandler = new InputHandler();
+                
+                // Test shooting callback registration
+                let shootCallbackTriggered = false;
+                inputHandler.onShoot(() => {
+                    shootCallbackTriggered = true;
+                    console.log('Shoot callback triggered!');
+                });
+                
+                // Simulate shooting input
+                inputHandler.handleShootInput();
+                
+                if (shootCallbackTriggered) {
+                    addTestResult('✅ Input shooting callback works', true);
+                } else {
+                    throw new Error('Shooting callback not triggered');
+                }
+                
+                // Test cooldown system
+                const canShootBefore = inputHandler.canShoot();
+                inputHandler.handleShootInput();
+                const canShootAfter = inputHandler.canShoot();
+                
+                if (canShootBefore && !canShootAfter) {
+                    addTestResult('✅ Shooting cooldown system works', true);
+                } else {
+                    addTestResult('⚠️ Shooting cooldown may not be working properly', false);
+                }
+                
+                console.log('✅ Input tests completed');
+                
+            } catch (error) {
+                console.error('❌ Input test failed:', error.message);
+                addTestResult(`❌ Input test failed: ${error.message}`, false);
+            }
+        }
+        
+        function runCollisionTests() {
+            console.log('💥 Running Collision System Tests...');
+            
+            try {
+                const collisionSystem = new CollisionSystem();
+                const bulletManager = new BulletManager();
+                const obstacleManager = new ObstacleManager();
+                
+                // Create test bullet
+                const bullet = bulletManager.addBullet(100, 100, 1);
+                if (!bullet) {
+                    throw new Error('Failed to create test bullet');
+                }
+                
+                // Create test floating obstacle
+                const obstacle = new Obstacle(110, 100, 'floating');
+                obstacle.canBeShot = true;
+                obstacle.active = true;
+                
+                // Test collision detection
+                const bullets = [bullet];
+                const obstacles = [obstacle];
+                
+                let collisionDetected = false;
+                collisionSystem.registerCollisionCallback('bullet-obstacle', (collision) => {
+                    collisionDetected = true;
+                    console.log('Test collision detected:', collision);
+                });
+                
+                const collisions = collisionSystem.checkBulletObstacleCollisions(bullets, obstacles);
+                
+                if (collisions.length > 0 || collisionDetected) {
+                    addTestResult('✅ Collision detection works', true);
+                } else {
+                    addTestResult('⚠️ No collision detected (may be expected)', false);
+                }
+                
+                console.log('✅ Collision tests completed');
+                
+            } catch (error) {
+                console.error('❌ Collision test failed:', error.message);
+                addTestResult(`❌ Collision test failed: ${error.message}`, false);
+            }
+        }
+        
+        function runFullIntegrationTest() {
+            console.log('🚀 Running Full Integration Test...');
+            
+            try {
+                // Create all systems
+                const inputHandler = new InputHandler();
+                const player = new Player(100, 300);
+                const bulletManager = new BulletManager();
+                const obstacleManager = new ObstacleManager();
+                const collisionSystem = new CollisionSystem();
+                const effectSystem = new EffectSystem();
+                
+                // Set up player shooting callback
+                let bulletCreated = false;
+                player.onShoot((shootInfo) => {
+                    console.log('Player shoot callback triggered:', shootInfo);
+                    const bullet = bulletManager.addBullet(shootInfo.x, shootInfo.y, shootInfo.direction);
+                    if (bullet) {
+                        bulletCreated = true;
+                        console.log('Bullet created successfully');
+                    }
+                });
+                
+                // Set up collision callback
+                let collisionHandled = false;
+                collisionSystem.registerCollisionCallback('bullet-obstacle', (collision) => {
+                    console.log('Collision callback triggered:', collision);
+                    collisionHandled = true;
+                    
+                    // Remove bullet
+                    bulletManager.removeBullet(collision.bullet);
+                    
+                    // Create effect
+                    effectSystem.addExplosion(collision.obstacle.x, collision.obstacle.y);
+                });
+                
+                // Test shooting
+                if (player.canShootNow()) {
+                    player.shoot();
+                    
+                    if (bulletCreated) {
+                        addTestResult('✅ End-to-end shooting works', true);
+                    } else {
+                        throw new Error('Bullet was not created');
+                    }
+                } else {
+                    addTestResult('⚠️ Player cannot shoot (cooldown?)', false);
+                }
+                
+                // Test system updates
+                bulletManager.update(0.016); // 16ms frame
+                effectSystem.update(0.016);
+                collisionSystem.update(0.016);
+                
+                addTestResult('✅ All systems can update without errors', true);
+                
+                console.log('🎉 Full integration test completed successfully!');
+                addTestResult('🎉 Full integration test passed!', true);
+                
+            } catch (error) {
+                console.error('❌ Full integration test failed:', error.message);
+                addTestResult(`❌ Full integration test failed: ${error.message}`, false);
+            }
+        }
+        
+        // Initialize
+        console.log('🎯 Shooting System Integration Test Ready');
+        console.log('Click the buttons above to run tests');
+        
+        // Auto-run basic tests on load
+        setTimeout(() => {
+            runBasicTests();
+        }, 1000);
+    </script>
+</body>
+</html>

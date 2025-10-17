@@ -65,6 +65,46 @@ class GameEngine {
             20
         );
         
+        // 创建子弹对象池
+        objectPoolManager.createPool(
+            'bullets',
+            () => new Bullet(0, 0, 1),
+            (bullet) => {
+                bullet.x = 0;
+                bullet.y = 0;
+                bullet.velocityX = 0;
+                bullet.velocityY = 0;
+                bullet.active = true;
+                bullet.lifeTime = 0;
+                bullet.traveledDistance = 0;
+                bullet.trailPositions = [];
+            },
+            15 // 子弹池大小
+        );
+        
+        // 创建效果对象池
+        objectPoolManager.createPool(
+            'effects',
+            () => ({
+                id: '',
+                type: '',
+                x: 0, y: 0,
+                startTime: 0,
+                duration: 0,
+                particles: [],
+                config: {},
+                active: false,
+                alpha: 1.0
+            }),
+            (effect) => {
+                effect.active = false;
+                effect.particles = [];
+                effect.alpha = 1.0;
+                effect.startTime = 0;
+            },
+            25 // 效果池大小
+        );
+        
         // 创建粒子对象池（如果需要）
         objectPoolManager.createPool(
             'particles',
@@ -85,7 +125,7 @@ class GameEngine {
             100
         );
         
-        console.log('对象池初始化完成');
+        console.log('对象池初始化完成（包括子弹和效果池）');
         
         // 注册内存清理任务
         this.registerMemoryCleanupTasks();
@@ -129,6 +169,36 @@ class GameEngine {
                 }
             }
         }, '清理输入状态');
+        
+        // 清理子弹系统
+        memoryManager.registerCleanupTask(() => {
+            const currentScene = this.sceneManager.getCurrentScene();
+            if (currentScene && currentScene.bulletManager) {
+                // 强制清理过多的子弹
+                const maxBullets = 20;
+                if (currentScene.bulletManager.bullets.length > maxBullets) {
+                    currentScene.bulletManager.forceCleanup();
+                }
+            }
+        }, '清理子弹系统');
+        
+        // 清理效果系统
+        memoryManager.registerCleanupTask(() => {
+            const currentScene = this.sceneManager.getCurrentScene();
+            if (currentScene && currentScene.effectSystem) {
+                // 清理已完成的效果
+                currentScene.effectSystem.removeFinishedEffects();
+                
+                // 如果效果过多，强制清理
+                const maxEffects = 30;
+                if (currentScene.effectSystem.getActiveEffectCount() > maxEffects) {
+                    const oldestEffects = currentScene.effectSystem.effects.slice(0, 10);
+                    oldestEffects.forEach(effect => {
+                        currentScene.effectSystem.removeEffectById(effect.id);
+                    });
+                }
+            }
+        }, '清理效果系统');
     }
     
     /**
@@ -218,6 +288,12 @@ class GameEngine {
         // 计算FPS
         this.calculateFPS(this.deltaTime);
         
+        // 记录帧性能到射击性能监控器
+        if (window.shootingPerformanceMonitor) {
+            const frameTime = this.deltaTime * 1000; // 转换为毫秒
+            window.shootingPerformanceMonitor.recordFramePerformance(frameTime);
+        }
+        
         if (!this.isPaused) {
             this.update(this.deltaTime);
         }
@@ -238,6 +314,9 @@ class GameEngine {
      * @param {number} deltaTime - 时间增量
      */
     update(deltaTime) {
+        // 更新输入处理器（处理射击冷却等）
+        this.inputHandler.update(deltaTime * 1000); // 转换为毫秒
+        
         // 使用系统集成管理器更新系统
         this.systemIntegration.updateSystems(deltaTime);
         

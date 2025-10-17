@@ -23,8 +23,33 @@ class BulletManager {
      * 初始化子弹对象池
      */
     initializeBulletPool() {
-        if (window.objectPoolManager) {
-            // 创建子弹对象池
+        // 优先使用优化对象池管理器
+        if (window.optimizedObjectPoolManager) {
+            this.optimizedPool = window.optimizedObjectPoolManager.createPool(
+                'bullets',
+                () => {
+                    this.stats.totalCreated++;
+                    return new Bullet(0, 0, 1);
+                },
+                (bullet) => {
+                    // 重置子弹状态
+                    bullet.active = true;
+                    bullet.lifeTime = 0;
+                    bullet.traveledDistance = 0;
+                    bullet.trailPositions = [];
+                    bullet.velocityX = 0;
+                    bullet.velocityY = 0;
+                },
+                15, // 初始池大小
+                50  // 最大池大小
+            );
+            
+            // 预热对象池
+            this.optimizedPool.warmup(10);
+            
+            console.log('优化子弹对象池已初始化');
+        } else if (window.objectPoolManager) {
+            // 回退到标准对象池
             objectPoolManager.createPool(
                 'bullets',
                 () => {
@@ -43,7 +68,7 @@ class BulletManager {
                 10 // 初始池大小
             );
             
-            console.log('子弹对象池已初始化');
+            console.log('标准子弹对象池已初始化');
         }
     }
     
@@ -52,6 +77,11 @@ class BulletManager {
      * @param {number} deltaTime - 时间增量（秒）
      */
     update(deltaTime) {
+        // 开始性能监控
+        if (window.shootingPerformanceMonitor) {
+            window.shootingPerformanceMonitor.startTimer('bulletUpdate');
+        }
+        
         const initialCount = this.bullets.length;
         
         // 更新所有子弹
@@ -66,6 +96,12 @@ class BulletManager {
         
         // 更新统计信息
         this.stats.currentActive = this.bullets.length;
+        
+        // 记录性能指标
+        if (window.shootingPerformanceMonitor) {
+            window.shootingPerformanceMonitor.recordBulletMetrics(this.stats);
+            window.shootingPerformanceMonitor.endTimer('bulletUpdate');
+        }
         
         // 性能监控：如果子弹数量过多，强制清理
         if (this.bullets.length > this.maxBullets) {
@@ -96,8 +132,18 @@ class BulletManager {
         
         let bullet = null;
         
-        // 尝试从对象池获取子弹
-        if (window.objectPoolManager) {
+        // 优先使用优化对象池
+        if (this.optimizedPool) {
+            bullet = this.optimizedPool.get();
+            if (bullet) {
+                this.stats.poolHits++;
+                // 重新初始化池中的子弹
+                this.initializeBullet(bullet, x, y, direction);
+            } else {
+                this.stats.poolMisses++;
+            }
+        } else if (window.objectPoolManager) {
+            // 回退到标准对象池
             bullet = objectPoolManager.get('bullets');
             if (bullet) {
                 this.stats.poolHits++;
@@ -165,9 +211,13 @@ class BulletManager {
         });
         
         // 将移除的子弹释放到对象池
-        if (window.objectPoolManager && bulletsToRemove.length > 0) {
+        if (bulletsToRemove.length > 0) {
             bulletsToRemove.forEach(bullet => {
-                objectPoolManager.release('bullets', bullet);
+                if (this.optimizedPool) {
+                    this.optimizedPool.release(bullet);
+                } else if (window.objectPoolManager) {
+                    objectPoolManager.release('bullets', bullet);
+                }
             });
         }
         
@@ -370,10 +420,20 @@ class BulletManager {
      * @param {Renderer} renderer - 渲染器
      */
     render(renderer) {
+        // 开始渲染性能监控
+        if (window.shootingPerformanceMonitor) {
+            window.shootingPerformanceMonitor.startTimer('bulletRender');
+        }
+        
         // 渲染所有活跃的子弹
         this.getBullets().forEach(bullet => {
             bullet.render(renderer);
         });
+        
+        // 结束渲染性能监控
+        if (window.shootingPerformanceMonitor) {
+            window.shootingPerformanceMonitor.endTimer('bulletRender');
+        }
         
         // 调试模式下显示统计信息
         if (GameConfig.DEBUG) {

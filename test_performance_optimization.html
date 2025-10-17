@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Performance Optimization Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f0f0f0;
+        }
+        .test-container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .metric-card {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 6px;
+            border-left: 4px solid #007bff;
+        }
+        .metric-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #007bff;
+        }
+        .metric-label {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .success { background-color: #d4edda; color: #155724; }
+        .error { background-color: #f8d7da; color: #721c24; }
+        .info { background-color: #d1ecf1; color: #0c5460; }
+        .warning { background-color: #fff3cd; color: #856404; }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background-color: #0056b3; }
+        button.danger { background-color: #dc3545; }
+        button.danger:hover { background-color: #c82333; }
+        button.success { background-color: #28a745; }
+        button.success:hover { background-color: #218838; }
+        #performance-chart {
+            width: 100%;
+            height: 200px;
+            background: #000;
+            border-radius: 4px;
+            position: relative;
+            overflow: hidden;
+        }
+        .optimization-log {
+            background: #000;
+            color: #00ff00;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            height: 150px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <h1>🚀 Performance Optimization Test</h1>
+    
+    <div class="test-container">
+        <h2>Performance Metrics</h2>
+        <div class="metrics-grid" id="metrics-grid">
+            <!-- Metrics will be populated here -->
+        </div>
+        <div id="performance-chart"></div>
+    </div>
+    
+    <div class="test-container">
+        <h2>Optimization Controls</h2>
+        <button onclick="startStressTest()">Start Stress Test</button>
+        <button onclick="stopStressTest()" class="danger">Stop Stress Test</button>
+        <button onclick="triggerOptimization()" class="success">Trigger Optimization</button>
+        <button onclick="resetOptimizer()">Reset Optimizer</button>
+        <button onclick="exportPerformanceData()">Export Data</button>
+        
+        <div style="margin-top: 15px;">
+            <label>Optimization Level: </label>
+            <select id="optimization-level" onchange="setOptimizationLevel(this.value)">
+                <option value="auto">Auto</option>
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+            </select>
+            
+            <label style="margin-left: 20px;">
+                <input type="checkbox" id="auto-optimization" checked onchange="toggleAutoOptimization(this.checked)">
+                Auto Optimization
+            </label>
+        </div>
+    </div>
+    
+    <div class="test-container">
+        <h2>Test Results</h2>
+        <div id="test-results"></div>
+    </div>
+    
+    <div class="test-container">
+        <h2>Optimization Log</h2>
+        <div class="optimization-log" id="optimization-log"></div>
+    </div>
+    
+    <!-- Load all necessary scripts -->
+    <script src="js/config.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/objectPool.js"></script>
+    <script src="js/memoryManager.js"></script>
+    <script src="js/performanceMonitor.js"></script>
+    <script src="js/performance/optimizedObjectPool.js"></script>
+    <script src="js/performance/shootingPerformanceMonitor.js"></script>
+    <script src="js/performance/performanceOptimizer.js"></script>
+    <script src="js/entities/entity.js"></script>
+    <script src="js/entities/bullet.js"></script>
+    <script src="js/managers/bulletManager.js"></script>
+    <script src="js/systems/effectSystem.js"></script>
+    
+    <script>
+        // Test state
+        let stressTestInterval = null;
+        let metricsUpdateInterval = null;
+        let testBulletManager = null;
+        let testEffectSystem = null;
+        
+        // Performance history for charting
+        let performanceHistory = {
+            fps: [],
+            bulletCount: [],
+            effectCount: [],
+            memoryUsage: []
+        };
+        
+        // Initialize test environment
+        function initializeTest() {
+            // Create test managers
+            testBulletManager = new BulletManager();
+            testEffectSystem = new EffectSystem();
+            
+            // Start metrics update
+            metricsUpdateInterval = setInterval(updateMetrics, 1000);
+            
+            console.log('Performance optimization test initialized');
+            logOptimization('Test environment initialized');
+        }
+        
+        // Update performance metrics display
+        function updateMetrics() {
+            const metrics = gatherTestMetrics();
+            updateMetricsDisplay(metrics);
+            updatePerformanceChart(metrics);
+        }
+        
+        // Gather test metrics
+        function gatherTestMetrics() {
+            const metrics = {
+                fps: 0,
+                frameTime: 0,
+                bulletCount: testBulletManager ? testBulletManager.getBullets().length : 0,
+                effectCount: testEffectSystem ? testEffectSystem.getActiveEffectCount() : 0,
+                memoryUsage: performance.memory ? performance.memory.usedJSHeapSize : 0,
+                poolEfficiency: 0
+            };
+            
+            // Get FPS from performance monitor
+            if (window.shootingPerformanceMonitor) {
+                const report = window.shootingPerformanceMonitor.getPerformanceReport();
+                metrics.fps = report.summary.fps;
+                metrics.frameTime = window.shootingPerformanceMonitor.metrics.performance.frameTime;
+                metrics.poolEfficiency = report.summary.bulletPoolEfficiency;
+            }
+            
+            // Add to history
+            performanceHistory.fps.push(metrics.fps);
+            performanceHistory.bulletCount.push(metrics.bulletCount);
+            performanceHistory.effectCount.push(metrics.effectCount);
+            performanceHistory.memoryUsage.push(metrics.memoryUsage / 1024 / 1024); // MB
+            
+            // Limit history size
+            const maxHistory = 60; // 1 minute of data
+            Object.keys(performanceHistory).forEach(key => {
+                if (performanceHistory[key].length > maxHistory) {
+                    performanceHistory[key].shift();
+                }
+            });
+            
+            return metrics;
+        }
+        
+        // Update metrics display
+        function updateMetricsDisplay(metrics) {
+            const grid = document.getElementById('metrics-grid');
+            
+            grid.innerHTML = `
+                <div class="metric-card">
+                    <div class="metric-value">${metrics.fps.toFixed(1)}</div>
+                    <div class="metric-label">FPS</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">${metrics.frameTime.toFixed(1)}ms</div>
+                    <div class="metric-label">Frame Time</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">${metrics.bulletCount}</div>
+                    <div class="metric-label">Active Bullets</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">${metrics.effectCount}</div>
+                    <div class="metric-label">Active Effects</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">${(metrics.memoryUsage / 1024 / 1024).toFixed(1)}MB</div>
+                    <div class="metric-label">Memory Usage</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">${metrics.poolEfficiency.toFixed(1)}%</div>
+                    <div class="metric-label">Pool Efficiency</div>
+                </div>
+            `;
+        }
+        
+        // Update performance chart
+        function updatePerformanceChart(metrics) {
+            const chart = document.getElementById('performance-chart');
+            const ctx = chart.getContext ? chart.getContext('2d') : null;
+            
+            if (!ctx) {
+                // Create canvas if not exists
+                const canvas = document.createElement('canvas');
+                canvas.width = chart.offsetWidth;
+                canvas.height = chart.offsetHeight;
+                canvas.style.width = '100%';
+                canvas.style.height = '100%';
+                chart.innerHTML = '';
+                chart.appendChild(canvas);
+                return;
+            }
+            
+            // Simple line chart for FPS
+            ctx.clearRect(0, 0, chart.width, chart.height);
+            
+            const fpsHistory = performanceHistory.fps;
+            if (fpsHistory.length > 1) {
+                ctx.strokeStyle = '#00ff00';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                
+                for (let i = 0; i < fpsHistory.length; i++) {
+                    const x = (i / fpsHistory.length) * chart.width;
+                    const y = chart.height - (fpsHistory[i] / 60) * chart.height;
+                    
+                    if (i === 0) {
+                        ctx.moveTo(x, y);
+                    } else {
+                        ctx.lineTo(x, y);
+                    }
+                }
+                
+                ctx.stroke();
+            }
+            
+            // Draw target FPS line
+            ctx.strokeStyle = '#ffff00';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([5, 5]);
+            const targetY = chart.height - (60 / 60) * chart.height;
+            ctx.beginPath();
+            ctx.moveTo(0, targetY);
+            ctx.lineTo(chart.width, targetY);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+        
+        // Start stress test
+        function startStressTest() {
+            if (stressTestInterval) return;
+            
+            logOptimization('Starting stress test...');
+            
+            stressTestInterval = setInterval(() => {
+                // Create bullets rapidly
+                for (let i = 0; i < 5; i++) {
+                    if (testBulletManager) {
+                        testBulletManager.addBullet(
+                            Math.random() * 800,
+                            Math.random() * 600,
+                            Math.random() > 0.5 ? 1 : -1
+                        );
+                    }
+                }
+                
+                // Create effects
+                for (let i = 0; i < 2; i++) {
+                    if (testEffectSystem) {
+                        testEffectSystem.addExplosion(
+                            Math.random() * 800,
+                            Math.random() * 600
+                        );
+                    }
+                }
+                
+                // Update systems
+                if (testBulletManager) {
+                    testBulletManager.update(0.016);
+                }
+                if (testEffectSystem) {
+                    testEffectSystem.update(0.016);
+                }
+                
+            }, 100); // Every 100ms
+            
+            addTestResult('Stress test started', 'info');
+        }
+        
+        // Stop stress test
+        function stopStressTest() {
+            if (stressTestInterval) {
+                clearInterval(stressTestInterval);
+                stressTestInterval = null;
+                logOptimization('Stress test stopped');
+                addTestResult('Stress test stopped', 'success');
+            }
+        }
+        
+        // Trigger manual optimization
+        function triggerOptimization() {
+            if (window.performanceOptimizer) {
+                window.performanceOptimizer.performOptimizationCheck();
+                logOptimization('Manual optimization triggered');
+                addTestResult('Manual optimization triggered', 'success');
+            } else {
+                addTestResult('Performance optimizer not available', 'error');
+            }
+        }
+        
+        // Reset optimizer
+        function resetOptimizer() {
+            if (window.shootingPerformanceMonitor) {
+                window.shootingPerformanceMonitor.reset();
+            }
+            
+            performanceHistory = {
+                fps: [],
+                bulletCount: [],
+                effectCount: [],
+                memoryUsage: []
+            };
+            
+            logOptimization('Performance monitor reset');
+            addTestResult('Performance monitor reset', 'success');
+        }
+        
+        // Set optimization level
+        function setOptimizationLevel(level) {
+            if (window.performanceOptimizer) {
+                window.performanceOptimizer.setOptimizationLevel(level);
+                logOptimization(`Optimization level set to: ${level}`);
+                addTestResult(`Optimization level set to: ${level}`, 'info');
+            }
+        }
+        
+        // Toggle auto optimization
+        function toggleAutoOptimization(enabled) {
+            if (window.performanceOptimizer) {
+                window.performanceOptimizer.setEnabled(enabled);
+                logOptimization(`Auto optimization ${enabled ? 'enabled' : 'disabled'}`);
+                addTestResult(`Auto optimization ${enabled ? 'enabled' : 'disabled'}`, 'info');
+            }
+        }
+        
+        // Export performance data
+        function exportPerformanceData() {
+            const data = {
+                performanceHistory: performanceHistory,
+                currentMetrics: gatherTestMetrics(),
+                optimizationReport: window.performanceOptimizer ? 
+                    window.performanceOptimizer.getOptimizationReport() : null,
+                shootingReport: window.shootingPerformanceMonitor ? 
+                    window.shootingPerformanceMonitor.getPerformanceReport() : null
+            };
+            
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `performance_data_${new Date().toISOString().slice(0, 19)}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+            
+            addTestResult('Performance data exported', 'success');
+        }
+        
+        // Add test result
+        function addTestResult(message, type) {
+            const results = document.getElementById('test-results');
+            const div = document.createElement('div');
+            div.className = `status ${type}`;
+            div.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            results.appendChild(div);
+            results.scrollTop = results.scrollHeight;
+        }
+        
+        // Log optimization message
+        function logOptimization(message) {
+            const log = document.getElementById('optimization-log');
+            const timestamp = new Date().toLocaleTimeString();
+            log.textContent += `[${timestamp}] ${message}\n`;
+            log.scrollTop = log.scrollHeight;
+        }
+        
+        // Override console.log to capture optimization messages
+        const originalConsoleLog = console.log;
+        console.log = function(...args) {
+            originalConsoleLog.apply(console, args);
+            const message = args.join(' ');
+            if (message.includes('优化') || message.includes('🔧') || message.includes('🚀')) {
+                logOptimization(message);
+            }
+        };
+        
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeTest();
+            
+            // Set up canvas for performance chart
+            const chart = document.getElementById('performance-chart');
+            const canvas = document.createElement('canvas');
+            canvas.width = 600;
+            canvas.height = 200;
+            canvas.style.width = '100%';
+            canvas.style.height = '100%';
+            chart.appendChild(canvas);
+            
+            addTestResult('Performance optimization test ready', 'success');
+        });
+        
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', function() {
+            stopStressTest();
+            if (metricsUpdateInterval) {
+                clearInterval(metricsUpdateInterval);
+            }
+        });
+    </script>
+</body>
+</html>

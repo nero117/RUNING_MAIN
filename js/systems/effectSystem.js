@@ -252,7 +252,13 @@ class EffectSystem {
      * @param {number} deltaTime - 时间增量（秒）
      */
     update(deltaTime) {
+        // 开始性能监控
+        if (window.shootingPerformanceMonitor) {
+            window.shootingPerformanceMonitor.startTimer('effectUpdate');
+        }
+        
         const currentTime = performance.now();
+        let totalParticles = 0;
         
         for (const effect of this.effects) {
             if (!effect.active) continue;
@@ -271,6 +277,9 @@ class EffectSystem {
                 case this.effectTypes.DESTRUCTION:
                 case this.effectTypes.PARTICLE_BURST:
                     this.updateParticleEffect(effect, deltaTime);
+                    if (effect.particles) {
+                        totalParticles += effect.particles.length;
+                    }
                     break;
                     
                 case this.effectTypes.SCORE_POPUP:
@@ -286,6 +295,16 @@ class EffectSystem {
         
         // 清理已完成的效果
         this.removeFinishedEffects();
+        
+        // 记录性能指标
+        if (window.shootingPerformanceMonitor) {
+            const effectStats = {
+                ...this.getStats(),
+                particleCount: totalParticles
+            };
+            window.shootingPerformanceMonitor.recordEffectMetrics(effectStats);
+            window.shootingPerformanceMonitor.endTimer('effectUpdate');
+        }
     }
     
     /**
@@ -329,6 +348,11 @@ class EffectSystem {
      * @param {Renderer} renderer - 渲染器
      */
     render(renderer) {
+        // 开始渲染性能监控
+        if (window.shootingPerformanceMonitor) {
+            window.shootingPerformanceMonitor.startTimer('effectRender');
+        }
+        
         this.stats.renderCalls = 0;
         
         for (const effect of this.effects) {
@@ -353,6 +377,11 @@ class EffectSystem {
             // 恢复透明度
             renderer.ctx.globalAlpha = originalAlpha;
             this.stats.renderCalls++;
+        }
+        
+        // 结束渲染性能监控
+        if (window.shootingPerformanceMonitor) {
+            window.shootingPerformanceMonitor.endTimer('effectRender');
         }
     }
     

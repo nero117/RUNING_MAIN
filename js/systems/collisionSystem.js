@@ -44,9 +44,19 @@ class CollisionSystem {
      * @returns {Object[]} 碰撞信息数组
      */
     checkBulletObstacleCollisions(bullets, floatingObstacles) {
+        // 开始碰撞检测性能监控
+        if (window.shootingPerformanceMonitor) {
+            window.shootingPerformanceMonitor.startTimer('collision');
+        }
+        
         const collisions = [];
         
-        if (!bullets || !floatingObstacles) return collisions;
+        if (!bullets || !floatingObstacles) {
+            if (window.shootingPerformanceMonitor) {
+                window.shootingPerformanceMonitor.endTimer('collision');
+            }
+            return collisions;
+        }
         
         // 只检查活跃的子弹
         const activeBullets = bullets.filter(bullet => bullet.active);
@@ -55,11 +65,14 @@ class CollisionSystem {
             obstacle.active && obstacle.canBeShot
         );
         
+        let collisionChecks = 0;
+        
         for (const bullet of activeBullets) {
             const bulletBounds = bullet.getBounds();
             
             for (const obstacle of shootableObstacles) {
                 const obstacleBounds = obstacle.getBounds();
+                collisionChecks++;
                 
                 if (this.physicsSystem.checkRectangleCollision(bulletBounds, obstacleBounds)) {
                     const collision = {
@@ -79,6 +92,15 @@ class CollisionSystem {
                     break;
                 }
             }
+        }
+        
+        // 更新碰撞检测统计
+        this.stats.totalChecks += collisionChecks;
+        
+        // 记录碰撞性能指标
+        if (window.shootingPerformanceMonitor) {
+            window.shootingPerformanceMonitor.recordCollisionMetrics(this.stats);
+            window.shootingPerformanceMonitor.endTimer('collision');
         }
         
         return collisions;
