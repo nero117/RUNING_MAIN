@@ -47,6 +47,9 @@ class GameScene extends Scene {
         // 创建效果系统
         this.effectSystem = new EffectSystem();
         
+        // 创建无敌状态系统
+        this.invincibilitySystem = new InvincibilitySystem();
+        
         // 注册碰撞回调
         this.collisionSystem.registerCollisionCallback('player-obstacle', (collision) => {
             this.handlePlayerObstacleCollision(collision);
@@ -65,12 +68,48 @@ class GameScene extends Scene {
         // 验证射击系统集成
         this.verifyShootingSystemIntegration();
         
+        // 验证美女角色系统集成
+        this.verifyBeautifulCharacterIntegration();
+        
         // 暴露测试函数到全局作用域（仅在调试模式下）
         if (GameConfig.DEBUG) {
             window.testShooting = () => this.testShootingSystemIntegration();
+            window.testBeautifulCharacter = () => this.testBeautifulCharacterIntegration();
         }
         
-        console.log('射击功能已集成到游戏循环');
+        console.log('射击功能和美女角色系统已集成到游戏循环');
+    }
+    
+    /**
+     * 验证美女角色系统集成
+     */
+    verifyBeautifulCharacterIntegration() {
+        const integrationChecks = {
+            player: !!this.player,
+            characterAssets: !!(this.player && this.player.characterAssets),
+            characterEffects: !!(this.player && this.player.characterEffects),
+            characterAssetsType: this.player && this.player.characterAssets && this.player.characterAssets.constructor.name === 'CharacterAssets',
+            characterEffectsType: this.player && this.player.characterEffects && this.player.characterEffects.constructor.name === 'CharacterEffects',
+            animationSystem: !!(this.player && this.player.characterAssets && this.player.characterAssets.animations),
+            invincibilitySystem: !!(this.player && this.player.characterEffects && this.player.characterEffects.invincibilityEffect),
+            renderingIntegration: !!(this.player && typeof this.player.render === 'function'),
+            invincibilityMethods: !!(this.player && typeof this.player.setInvincible === 'function' && typeof this.player.isInvincible === 'function')
+        };
+        
+        const allSystemsReady = Object.values(integrationChecks).every(check => check === true);
+        
+        if (allSystemsReady) {
+            console.log('✅ 美女角色系统集成验证通过 - 所有系统已正确连接');
+            console.log('🎭 美女角色特性:');
+            console.log('  - 华丽的美女角色动画 (奔跑、跳跃、射击)');
+            console.log('  - 精美的视觉效果和粒子系统');
+            console.log('  - 无敌状态的发光和闪烁效果');
+            console.log('  - 完整的角色资源管理系统');
+        } else {
+            console.warn('⚠️ 美女角色系统集成验证失败:', integrationChecks);
+        }
+        
+        return allSystemsReady;
     }
     
     /**
@@ -161,6 +200,11 @@ class GameScene extends Scene {
         if (this.scoreSystem) {
             this.scoreSystem.reset();
         }
+        
+        // 重置无敌状态
+        if (this.invincibilitySystem) {
+            this.invincibilitySystem.reset();
+        }
     }
     
     /**
@@ -208,6 +252,11 @@ class GameScene extends Scene {
             this.effectSystem.update(deltaTime);
         }
         
+        // 更新无敌状态系统
+        if (this.invincibilitySystem) {
+            this.invincibilitySystem.update(deltaTime);
+        }
+        
         // 记录射击统计到性能监控器
         if (window.shootingPerformanceMonitor) {
             window.shootingPerformanceMonitor.recordShootingMetrics(this.shootingStats);
@@ -218,6 +267,9 @@ class GameScene extends Scene {
         
         // 检查子弹与障碍物碰撞
         this.checkBulletCollisions();
+        
+        // 检查跳过的障碍物（新得分系统）
+        this.checkJumpedObstacles();
     }
     
     /**
@@ -255,6 +307,18 @@ class GameScene extends Scene {
      * @param {Object} collision - 碰撞信息
      */
     handlePlayerObstacleCollision(collision) {
+        // 检查是否处于无敌状态 - 优先使用玩家内置的美女角色无敌系统
+        if (this.player && this.player.isInvincible()) {
+            console.log('🛡️ 美女角色处于华丽无敌状态，忽略碰撞');
+            return;
+        }
+        
+        // 备用检查：使用独立的无敌系统
+        if (this.invincibilitySystem && this.invincibilitySystem.isPlayerInvincible()) {
+            console.log('🛡️ 玩家处于无敌状态，忽略碰撞');
+            return;
+        }
+        
         console.log('检测到碰撞:', collision);
         
         // 添加碰撞效果
@@ -300,18 +364,40 @@ class GameScene extends Scene {
         const isDestroyed = obstacle.takeDamage();
         
         if (isDestroyed) {
-            console.log('💥 障碍物被摧毁');
+            console.log('💥 漂浮障碍物被摧毁');
+            
+            // 检查是否为特殊障碍物
+            const isSpecial = obstacle.isSpecialObstacle && obstacle.isSpecialObstacle();
             
             // 障碍物被摧毁，从障碍物管理器中移除
             if (this.obstacleManager) {
                 this.obstacleManager.removeObstacle(obstacle);
             }
             
-            // 使用新的射击得分系统添加得分奖励
+            // 处理特殊障碍物效果 - 使用美女角色内置的无敌系统
+            if (isSpecial) {
+                if (this.player) {
+                    // 使用玩家内置的美女角色无敌系统
+                    this.player.setInvincible(10); // 10秒无敌
+                    console.log('🛡️ 击中彩色漂浮物，美女角色激活华丽无敌状态！');
+                } else if (this.invincibilitySystem) {
+                    // 备用：使用独立的无敌系统
+                    this.invincibilitySystem.activate(10000); // 10秒无敌
+                    console.log('🛡️ 击中彩色漂浮物，激活无敌状态！');
+                }
+            }
+            
+            // 使用新的射击得分系统 - 漂浮障碍物统一30分
             let scoreBonus = 0;
             if (this.scoreSystem) {
-                const obstacleType = obstacle.type || 'floating';
-                scoreBonus = this.scoreSystem.addShootingScore(obstacleType);
+                scoreBonus = this.scoreSystem.addShootingScore('floating'); // 统一30分
+                
+                // 特殊障碍物额外奖励
+                if (isSpecial) {
+                    const bonusScore = this.scoreSystem.addScore(50); // 额外50分奖励
+                    scoreBonus += 50;
+                    console.log('🌟 特殊障碍物额外奖励: 50分');
+                }
                 
                 // 更新最高连击记录
                 const currentCombo = this.scoreSystem.getComboCount();
@@ -319,22 +405,52 @@ class GameScene extends Scene {
                     this.shootingStats.maxCombo = currentCombo;
                 }
                 
-                console.log(`🏆 获得射击得分奖励: ${scoreBonus} (类型: ${obstacleType}, 连击: ${currentCombo})`);
+                console.log(`🏆 射击漂浮障碍物得分: ${scoreBonus}分 (连击: ${currentCombo})`);
             }
             
-            // 添加爆炸效果
+            // 添加爆炸效果（新需求：漂浮障碍物爆炸消失）
             if (this.effectSystem) {
                 const obstacleBounds = obstacle.getBounds();
                 const centerX = obstacleBounds.x + obstacleBounds.width / 2;
                 const centerY = obstacleBounds.y + obstacleBounds.height / 2;
                 
-                // 创建爆炸效果
-                this.effectSystem.addExplosion(centerX, centerY);
-                console.log('💥 爆炸效果已创建');
+                // 特殊障碍物的特殊效果
+                if (isSpecial) {
+                    // 创建特殊的无敌激活效果
+                    this.effectSystem.addExplosion(centerX, centerY, {
+                        particleCount: 20,
+                        particleSpeed: 300,
+                        colors: ['#ffff00', '#ff8000', '#ff0080', '#8000ff', '#00ff80'],
+                        size: 25,
+                        duration: 1.2
+                    });
+                    
+                    // 创建无敌状态提示
+                    this.effectSystem.addScorePopup(centerX, centerY - 40, '无敌状态激活!');
+                    
+                    console.log('✨ 特殊无敌激活效果已创建');
+                } else {
+                    // 普通爆炸效果
+                    this.effectSystem.addExplosion(centerX, centerY, {
+                        particleCount: 12,
+                        particleSpeed: 200,
+                        colors: ['#ff6b35', '#f7931e', '#ffcc02', '#fff200', '#ff0080'],
+                        size: 20,
+                        duration: 0.8
+                    });
+                }
                 
-                // 创建得分弹出效果，显示实际获得的得分
-                this.effectSystem.addScorePopup(centerX, centerY - 20, scoreBonus);
+                console.log('💥 漂浮障碍物爆炸效果已创建');
+                
+                // 创建得分弹出效果
+                this.effectSystem.addScorePopup(centerX, centerY - 30, scoreBonus);
                 console.log('📈 得分弹出效果已创建');
+                
+                // 添加额外的粒子爆发效果
+                this.effectSystem.addParticleBurst(centerX, centerY, {
+                    particleCount: isSpecial ? 15 : 8,
+                    colors: isSpecial ? ['#ffff00', '#ff8000', '#ff0080', '#8000ff'] : ['#ffff00', '#ff8000', '#ff4000']
+                });
             }
         } else {
             console.log('障碍物受到伤害但未被摧毁');
@@ -399,6 +515,41 @@ class GameScene extends Scene {
         if (GameConfig.DEBUG && collisions.length > 0) {
             console.log(`💥 检测到 ${collisions.length} 个碰撞`);
         }
+    }
+    
+    /**
+     * 检查跳过的障碍物（新得分系统）
+     */
+    checkJumpedObstacles() {
+        if (!this.player || !this.obstacleManager || !this.scoreSystem) {
+            return;
+        }
+        
+        const playerBounds = this.player.getBounds();
+        const obstacles = this.obstacleManager.getObstacles();
+        
+        // 检查地面障碍物
+        obstacles.forEach(obstacle => {
+            if (obstacle.active && !obstacle.scored) {
+                // 检查玩家是否已经跳过这个障碍物
+                if (playerBounds.x > obstacle.x + obstacle.width) {
+                    // 玩家已经跳过这个障碍物
+                    obstacle.scored = true; // 标记为已得分，避免重复计分
+                    
+                    // 根据障碍物类型给予得分
+                    const score = this.scoreSystem.addJumpScore(obstacle.type);
+                    
+                    // 创建得分弹出效果
+                    if (this.effectSystem) {
+                        const centerX = obstacle.x + obstacle.width / 2;
+                        const centerY = obstacle.y - 20;
+                        this.effectSystem.addScorePopup(centerX, centerY, score);
+                    }
+                    
+                    console.log(`🏃 跳过障碍物得分: 类型=${obstacle.type}, 得分=${score}`);
+                }
+            }
+        });
     }
     
     /**
@@ -501,9 +652,19 @@ class GameScene extends Scene {
             this.bulletManager.render(renderer);
         }
         
-        // 渲染玩家（后渲染，在前面）
+        // 渲染美女角色玩家（后渲染，在前面）
         if (this.player) {
+            // 美女角色已经内置了完整的渲染系统，包括：
+            // - 美女角色动画渲染 (CharacterAssets)
+            // - 华丽无敌状态特效 (CharacterEffects)
+            // - 动画状态切换和视觉效果
             this.player.render(renderer);
+            
+            // 备用：渲染独立无敌系统效果（如果需要）
+            if (this.invincibilitySystem && this.invincibilitySystem.isPlayerInvincible() && !this.player.isInvincible()) {
+                this.invincibilitySystem.renderPlayerEffect(renderer, this.player);
+                this.invincibilitySystem.renderActivationEffect(renderer, this.player);
+            }
         }
         
         // 渲染效果（最后渲染，在所有实体前面）
@@ -547,7 +708,28 @@ class GameScene extends Scene {
                 '14px Arial'
             );
             
-            // 渲染射击得分提示
+            // 渲染美女角色无敌状态UI - 优先使用玩家内置系统
+            if (this.player && this.player.isInvincible()) {
+                // 美女角色的华丽无敌状态UI已经在player.render()中渲染
+                // 这里可以添加额外的UI元素
+                const timeLeft = Math.ceil(this.player.getInvincibleTimeLeft());
+                if (timeLeft > 0) {
+                    renderer.drawTextWithStroke(
+                        `✨ 美女角色无敌状态: ${timeLeft}秒 ✨`,
+                        GameConfig.CANVAS_WIDTH / 2,
+                        80,
+                        timeLeft <= 3 ? '#ff69b4' : '#ffd700',
+                        '#000000',
+                        'bold 16px Arial',
+                        'center'
+                    );
+                }
+            } else if (this.invincibilitySystem && this.invincibilitySystem.isPlayerInvincible()) {
+                // 备用：使用独立无敌系统UI
+                this.invincibilitySystem.renderUI(renderer);
+            }
+            
+            // 渲染得分系统提示
             if (this.scoreSystem && this.scoreSystem.getComboCount() > 1) {
                 const comboCount = this.scoreSystem.getComboCount();
                 const comboMultiplier = this.scoreSystem.getComboMultiplier(comboCount);
@@ -561,13 +743,26 @@ class GameScene extends Scene {
                 );
             } else {
                 renderer.drawTextWithStroke(
-                    '射击漂浮障碍物获得额外得分！',
+                    '跳过障碍物: 小10分 中20分 大30分 | 射击漂浮障碍物: 30分 | 彩色漂浮物: 美女角色无敌10秒',
                     20,
                     40,
                     '#ffff88',
                     '#000000',
                     '12px Arial'
                 );
+                
+                // 显示美女角色状态信息
+                if (this.player && this.player.characterAssets) {
+                    const animInfo = this.player.getAnimationInfo();
+                    renderer.drawTextWithStroke(
+                        `美女角色: ${animInfo.state} 动画 (帧 ${animInfo.frame + 1}/${animInfo.totalFrames})`,
+                        20,
+                        60,
+                        '#ff69b4',
+                        '#000000',
+                        '12px Arial'
+                    );
+                }
             }
         }
     }
@@ -865,6 +1060,92 @@ class GameScene extends Scene {
             obstacles: activeObstacles.length,
             effects: activeEffects
         };
+    }
+    
+    /**
+     * 测试美女角色完整功能（调试用）
+     */
+    testBeautifulCharacterIntegration() {
+        console.log('🎭 开始美女角色完整功能测试...');
+        
+        if (!this.player) {
+            console.error('❌ 玩家实例不存在');
+            return false;
+        }
+        
+        // 测试1: 验证美女角色系统存在
+        const characterSystems = {
+            characterAssets: this.player.characterAssets,
+            characterEffects: this.player.characterEffects
+        };
+        
+        for (const [name, system] of Object.entries(characterSystems)) {
+            if (!system) {
+                console.error(`❌ ${name} 系统未初始化`);
+                return false;
+            }
+        }
+        console.log('✅ 美女角色系统已初始化');
+        
+        // 测试2: 验证动画状态切换
+        const animationStates = ['running', 'jumping', 'shooting'];
+        for (const state of animationStates) {
+            this.player.animationState = state;
+            this.player.characterAssets.updateAnimation(state, 0.1);
+            const currentFrame = this.player.characterAssets.getCurrentFrame();
+            if (currentFrame < 0) {
+                console.error(`❌ ${state} 动画状态异常`);
+                return false;
+            }
+        }
+        console.log('✅ 美女角色动画状态切换正常');
+        
+        // 测试3: 测试无敌状态效果
+        const wasInvincible = this.player.isInvincible();
+        this.player.setInvincible(2); // 2秒测试
+        
+        if (!this.player.isInvincible()) {
+            console.error('❌ 美女角色无敌状态激活失败');
+            return false;
+        }
+        
+        if (!this.player.characterEffects.hasInvincibilityEffect()) {
+            console.error('❌ 美女角色华丽视觉效果未激活');
+            return false;
+        }
+        
+        console.log('✅ 美女角色华丽无敌状态激活成功');
+        
+        // 测试4: 测试渲染集成
+        try {
+            // 模拟渲染测试
+            const mockRenderer = {
+                save: () => {},
+                restore: () => {},
+                ctx: {
+                    shadowColor: '',
+                    shadowBlur: 0,
+                    globalCompositeOperation: 'source-over'
+                }
+            };
+            
+            this.player.characterAssets.renderCharacter(mockRenderer, 100, 100, 'running', 1.0);
+            this.player.characterEffects.render(mockRenderer);
+            console.log('✅ 美女角色渲染系统集成正常');
+        } catch (error) {
+            console.error('❌ 美女角色渲染系统异常:', error);
+            return false;
+        }
+        
+        // 恢复原始状态
+        if (!wasInvincible) {
+            this.player.isInvincible = false;
+            this.player.invincibleTimeLeft = 0;
+            this.player.characterEffects.deactivateInvincibilityEffect();
+        }
+        
+        console.log('🎉 美女角色完整功能测试通过！');
+        return true;
     }
     
     /**

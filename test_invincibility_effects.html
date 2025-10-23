@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>美女角色无敌状态效果测试</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: Arial, sans-serif;
+            color: white;
+        }
+        
+        canvas {
+            border: 2px solid #fff;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.3);
+            display: block;
+            margin: 20px auto;
+            background: linear-gradient(to bottom, #87CEEB 0%, #98FB98 100%);
+        }
+        
+        .controls {
+            text-align: center;
+            margin: 20px 0;
+        }
+        
+        button {
+            background: linear-gradient(45deg, #ff69b4, #ff1493);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            margin: 5px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            box-shadow: 0 4px 15px rgba(255, 105, 180, 0.4);
+            transition: all 0.3s ease;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(255, 105, 180, 0.6);
+        }
+        
+        .info {
+            text-align: center;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px auto;
+            max-width: 600px;
+        }
+        
+        .status {
+            font-size: 18px;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        
+        .invincible {
+            color: #ffff00;
+            text-shadow: 0 0 10px #ffff00;
+        }
+        
+        .normal {
+            color: #ffffff;
+        }
+    </style>
+</head>
+<body>
+    <h1 style="text-align: center; text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);">
+        ✨ 美女角色无敌状态效果测试 ✨
+    </h1>
+    
+    <div class="info">
+        <p>测试美女角色的华丽无敌状态视觉效果</p>
+        <p>包括：发光效果、闪烁动画、粒子系统、心形光环等</p>
+    </div>
+    
+    <canvas id="gameCanvas" width="800" height="400"></canvas>
+    
+    <div class="controls">
+        <button onclick="activateInvincibility(5)">激活5秒无敌</button>
+        <button onclick="activateInvincibility(10)">激活10秒无敌</button>
+        <button onclick="deactivateInvincibility()">停止无敌</button>
+        <button onclick="toggleAnimation()">切换动画</button>
+    </div>
+    
+    <div class="info">
+        <div class="status" id="statusDisplay">状态：正常</div>
+        <div id="effectInfo">效果信息：无</div>
+    </div>
+
+    <!-- 游戏脚本 -->
+    <script src="js/config.js"></script>
+    <script src="js/renderer.js"></script>
+    <script src="js/entities/entity.js"></script>
+    <script src="js/physics.js"></script>
+    <script src="js/entities/characterAssets.js"></script>
+    <script src="js/entities/characterEffects.js"></script>
+    <script src="js/entities/player.js"></script>
+
+    <script>
+        // 游戏变量
+        let canvas, renderer, player;
+        let lastTime = 0;
+        let animationStates = ['running', 'jumping', 'shooting'];
+        let currentAnimationIndex = 0;
+        
+        // 初始化游戏
+        function initGame() {
+            canvas = document.getElementById('gameCanvas');
+            renderer = new Renderer(canvas);
+            
+            // 创建玩家
+            player = new Player(350, 300);
+            
+            console.log('美女角色无敌效果测试初始化完成');
+            
+            // 开始游戏循环
+            gameLoop();
+        }
+        
+        // 游戏主循环
+        function gameLoop(currentTime = 0) {
+            const deltaTime = (currentTime - lastTime) / 1000;
+            lastTime = currentTime;
+            
+            // 更新
+            update(deltaTime);
+            
+            // 渲染
+            render();
+            
+            // 更新状态显示
+            updateStatusDisplay();
+            
+            requestAnimationFrame(gameLoop);
+        }
+        
+        // 更新游戏状态
+        function update(deltaTime) {
+            if (player) {
+                player.update(deltaTime);
+            }
+        }
+        
+        // 渲染游戏
+        function render() {
+            // 清空画布
+            renderer.clear();
+            
+            // 绘制背景
+            drawBackground();
+            
+            // 渲染玩家
+            if (player) {
+                player.render(renderer);
+            }
+            
+            // 绘制说明文字
+            drawInstructions();
+        }
+        
+        // 绘制背景
+        function drawBackground() {
+            // 绘制地面
+            renderer.fillRect(0, GameConfig.GROUND_Y, canvas.width, canvas.height - GameConfig.GROUND_Y, '#90EE90');
+            
+            // 绘制云朵
+            for (let i = 0; i < 5; i++) {
+                const x = (i * 160 + Date.now() * 0.02) % (canvas.width + 100);
+                const y = 50 + Math.sin(Date.now() * 0.001 + i) * 20;
+                drawCloud(x, y);
+            }
+        }
+        
+        // 绘制云朵
+        function drawCloud(x, y) {
+            renderer.save();
+            renderer.setGlobalAlpha(0.8);
+            
+            // 云朵主体
+            renderer.drawCircle(x, y, 20, '#ffffff');
+            renderer.drawCircle(x + 15, y, 25, '#ffffff');
+            renderer.drawCircle(x + 30, y, 20, '#ffffff');
+            renderer.drawCircle(x + 15, y - 10, 15, '#ffffff');
+            
+            renderer.restore();
+        }
+        
+        // 绘制说明文字
+        function drawInstructions() {
+            renderer.save();
+            renderer.ctx.font = 'bold 16px Arial';
+            renderer.ctx.fillStyle = '#ffffff';
+            renderer.ctx.strokeStyle = '#000000';
+            renderer.ctx.lineWidth = 2;
+            renderer.ctx.textAlign = 'center';
+            
+            const instructions = [
+                '观察美女角色的华丽无敌状态效果',
+                '包括发光、粒子、心形光环等特效'
+            ];
+            
+            instructions.forEach((text, index) => {
+                const y = 30 + index * 25;
+                renderer.ctx.strokeText(text, canvas.width / 2, y);
+                renderer.ctx.fillText(text, canvas.width / 2, y);
+            });
+            
+            renderer.restore();
+        }
+        
+        // 更新状态显示
+        function updateStatusDisplay() {
+            const statusElement = document.getElementById('statusDisplay');
+            const effectElement = document.getElementById('effectInfo');
+            
+            if (player && player.isInvincible) {
+                const timeLeft = Math.ceil(player.getInvincibleTimeLeft());
+                statusElement.textContent = `状态：✨ 无敌状态 (${timeLeft}秒) ✨`;
+                statusElement.className = 'status invincible';
+                
+                const glowIntensity = player.characterEffects.getGlowIntensity();
+                const particleCount = player.characterEffects.invincibilityEffect.sparkleParticles.length;
+                effectElement.textContent = `效果信息：发光强度 ${(glowIntensity * 100).toFixed(1)}% | 粒子数量 ${particleCount}`;
+            } else {
+                statusElement.textContent = '状态：正常';
+                statusElement.className = 'status normal';
+                effectElement.textContent = '效果信息：无';
+            }
+        }
+        
+        // 激活无敌状态
+        function activateInvincibility(duration) {
+            if (player) {
+                player.setInvincible(duration);
+                console.log(`激活${duration}秒无敌状态`);
+            }
+        }
+        
+        // 停止无敌状态
+        function deactivateInvincibility() {
+            if (player) {
+                player.isInvincible = false;
+                player.invincibleTimeLeft = 0;
+                player.characterEffects.deactivateInvincibilityEffect();
+                console.log('手动停止无敌状态');
+            }
+        }
+        
+        // 切换动画状态
+        function toggleAnimation() {
+            if (player) {
+                currentAnimationIndex = (currentAnimationIndex + 1) % animationStates.length;
+                player.animationState = animationStates[currentAnimationIndex];
+                console.log(`切换到动画状态: ${player.animationState}`);
+            }
+        }
+        
+        // 页面加载完成后初始化
+        window.addEventListener('load', initGame);
+        
+        // 键盘控制
+        document.addEventListener('keydown', (event) => {
+            switch (event.code) {
+                case 'Space':
+                    event.preventDefault();
+                    if (player) {
+                        player.jump();
+                    }
+                    break;
+                case 'KeyX':
+                case 'ControlLeft':
+                case 'ControlRight':
+                    event.preventDefault();
+                    if (player) {
+                        player.shoot();
+                    }
+                    break;
+                case 'KeyI':
+                    event.preventDefault();
+                    activateInvincibility(10);
+                    break;
+                case 'KeyO':
+                    event.preventDefault();
+                    deactivateInvincibility();
+                    break;
+                case 'KeyA':
+                    event.preventDefault();
+                    toggleAnimation();
+                    break;
+            }
+        });
+        
+        console.log('美女角色无敌状态效果测试页面加载完成');
+        console.log('控制说明：');
+        console.log('- 空格键：跳跃');
+        console.log('- X键/Ctrl键：射击');
+        console.log('- I键：激活10秒无敌');
+        console.log('- O键：停止无敌');
+        console.log('- A键：切换动画状态');
+    </script>
+</body>
+</html>

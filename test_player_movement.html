@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>玩家移动测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #1a1a1a;
+            color: #ffffff;
+            margin: 0;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        
+        .test-canvas {
+            border: 2px solid #34495e;
+            background-color: #87CEEB;
+            display: block;
+            margin: 20px auto;
+        }
+        
+        .controls {
+            text-align: center;
+            margin: 20px 0;
+            background-color: #2d2d2d;
+            padding: 15px;
+            border-radius: 8px;
+        }
+        
+        .status {
+            background-color: #333;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        
+        .status-item {
+            margin: 5px 0;
+            font-family: 'Courier New', monospace;
+        }
+        
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        
+        button:hover {
+            background-color: #45a049;
+        }
+        
+        .highlight {
+            color: #4CAF50;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎮 玩家移动测试</h1>
+        
+        <div class="controls">
+            <h3>控制说明：</h3>
+            <p><strong>空格键</strong> - 跳跃 | <strong>Q键</strong> - 射击</p>
+            <button onclick="testJump()">测试跳跃</button>
+            <button onclick="testShoot()">测试射击</button>
+            <button onclick="resetPlayer()">重置玩家</button>
+        </div>
+        
+        <canvas id="testCanvas" class="test-canvas" width="800" height="400"></canvas>
+        
+        <div class="status">
+            <h3>玩家状态：</h3>
+            <div class="status-item">位置: <span id="position" class="highlight">未知</span></div>
+            <div class="status-item">速度: <span id="velocity" class="highlight">未知</span></div>
+            <div class="status-item">在地面: <span id="grounded" class="highlight">未知</span></div>
+            <div class="status-item">可跳跃: <span id="canJump" class="highlight">未知</span></div>
+            <div class="status-item">动画状态: <span id="animState" class="highlight">未知</span></div>
+            <div class="status-item">无敌状态: <span id="invincible" class="highlight">未知</span></div>
+        </div>
+        
+        <div class="status">
+            <h3>测试日志：</h3>
+            <div id="testLog" style="height: 150px; overflow-y: auto; background-color: #1a1a1a; padding: 10px; border-radius: 4px; font-family: 'Courier New', monospace; font-size: 12px;"></div>
+        </div>
+    </div>
+
+    <!-- 加载游戏模块 -->
+    <script src="js/config.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/physics.js"></script>
+    <script src="js/entities/entity.js"></script>
+    <script src="js/entities/characterAssets.js"></script>
+    <script src="js/entities/characterEffects.js"></script>
+    <script src="js/entities/player.js"></script>
+    <script src="js/renderer.js"></script>
+
+    <script>
+        let testPlayer = null;
+        let testRenderer = null;
+        let animationId = null;
+        let lastTime = 0;
+        
+        // 日志函数
+        function log(message) {
+            const logElement = document.getElementById('testLog');
+            const timestamp = new Date().toLocaleTimeString();
+            logElement.innerHTML += `[${timestamp}] ${message}<br>`;
+            logElement.scrollTop = logElement.scrollHeight;
+        }
+        
+        // 初始化测试
+        function initTest() {
+            try {
+                const canvas = document.getElementById('testCanvas');
+                testRenderer = new Renderer(canvas);
+                
+                // 创建测试玩家
+                testPlayer = new Player(
+                    GameConfig.PLAYER.CENTER_X - GameConfig.PLAYER.WIDTH / 2,
+                    GameConfig.GROUND_Y - GameConfig.PLAYER.HEIGHT
+                );
+                
+                log('✅ 测试环境初始化成功');
+                log('🎮 玩家已创建，位置: (' + testPlayer.x + ', ' + testPlayer.y + ')');
+                
+                // 开始渲染循环
+                startRenderLoop();
+                
+                // 开始状态更新
+                startStatusUpdate();
+                
+            } catch (error) {
+                log('❌ 初始化失败: ' + error.message);
+                console.error('初始化错误:', error);
+            }
+        }
+        
+        // 开始渲染循环
+        function startRenderLoop() {
+            function render(currentTime) {
+                if (lastTime === 0) lastTime = currentTime;
+                const deltaTime = (currentTime - lastTime) / 1000;
+                lastTime = currentTime;
+                
+                // 更新玩家
+                if (testPlayer) {
+                    testPlayer.update(deltaTime);
+                }
+                
+                // 渲染
+                if (testRenderer && testPlayer) {
+                    // 清空画布
+                    testRenderer.clear();
+                    
+                    // 绘制地面
+                    testRenderer.fillRect(0, GameConfig.GROUND_Y, GameConfig.CANVAS_WIDTH, 
+                                        GameConfig.CANVAS_HEIGHT - GameConfig.GROUND_Y, '#8B4513');
+                    
+                    // 绘制中心线（调试用）
+                    testRenderer.drawRect(GameConfig.PLAYER.CENTER_X - 1, 0, 2, 
+                                        GameConfig.CANVAS_HEIGHT, 'rgba(255, 255, 0, 0.3)');
+                    
+                    // 渲染玩家
+                    testPlayer.render(testRenderer);
+                    
+                    // 绘制调试信息
+                    testRenderer.drawText('玩家移动测试', 10, 20, '#ffffff', '16px Arial');
+                    testRenderer.drawText('按空格键跳跃，Q键射击', 10, 40, '#ffff88', '14px Arial');
+                }
+                
+                animationId = requestAnimationFrame(render);
+            }
+            
+            animationId = requestAnimationFrame(render);
+        }
+        
+        // 开始状态更新
+        function startStatusUpdate() {
+            function updateStatus() {
+                if (testPlayer) {
+                    document.getElementById('position').textContent = 
+                        `(${Math.round(testPlayer.x)}, ${Math.round(testPlayer.y)})`;
+                    document.getElementById('velocity').textContent = 
+                        `(${Math.round(testPlayer.velocityX)}, ${Math.round(testPlayer.velocityY)})`;
+                    document.getElementById('grounded').textContent = 
+                        testPlayer.isGrounded ? '是' : '否';
+                    document.getElementById('canJump').textContent = 
+                        testPlayer.canJump ? '是' : '否';
+                    document.getElementById('animState').textContent = 
+                        testPlayer.animationState || '未知';
+                    document.getElementById('invincible').textContent = 
+                        testPlayer.isInvincible() ? `是 (${Math.ceil(testPlayer.getInvincibleTimeLeft())}s)` : '否';
+                }
+                
+                setTimeout(updateStatus, 100);
+            }
+            
+            updateStatus();
+        }
+        
+        // 测试跳跃
+        function testJump() {
+            if (testPlayer) {
+                const wasGrounded = testPlayer.isGrounded;
+                const canJump = testPlayer.canJump;
+                
+                log(`🦘 测试跳跃 - 在地面: ${wasGrounded}, 可跳跃: ${canJump}`);
+                
+                testPlayer.jump();
+                
+                setTimeout(() => {
+                    log(`跳跃后速度: (${testPlayer.velocityX}, ${testPlayer.velocityY})`);
+                }, 50);
+            } else {
+                log('❌ 玩家未初始化');
+            }
+        }
+        
+        // 测试射击
+        function testShoot() {
+            if (testPlayer) {
+                const canShoot = testPlayer.canShootNow();
+                
+                log(`🔫 测试射击 - 可射击: ${canShoot}`);
+                
+                const result = testPlayer.shoot();
+                
+                if (result) {
+                    log('✅ 射击成功');
+                } else {
+                    log('⏳ 射击冷却中或其他原因');
+                }
+            } else {
+                log('❌ 玩家未初始化');
+            }
+        }
+        
+        // 重置玩家
+        function resetPlayer() {
+            if (testPlayer) {
+                testPlayer.x = GameConfig.PLAYER.CENTER_X - GameConfig.PLAYER.WIDTH / 2;
+                testPlayer.y = GameConfig.GROUND_Y - GameConfig.PLAYER.HEIGHT;
+                testPlayer.velocityX = 0;
+                testPlayer.velocityY = 0;
+                testPlayer.isGrounded = true;
+                testPlayer.canJump = true;
+                testPlayer.isInvincible = false;
+                testPlayer.invincibleTimeLeft = 0;
+                
+                log('🔄 玩家状态已重置');
+            }
+        }
+        
+        // 键盘事件处理
+        document.addEventListener('keydown', (event) => {
+            if (!testPlayer) return;
+            
+            switch (event.keyCode) {
+                case 32: // 空格键 - 跳跃
+                    event.preventDefault();
+                    testJump();
+                    break;
+                case 81: // Q键 - 射击
+                    event.preventDefault();
+                    testShoot();
+                    break;
+            }
+        });
+        
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            log('🚀 页面加载完成，开始初始化测试环境...');
+            setTimeout(initTest, 100);
+        });
+        
+        // 页面卸载时清理
+        window.addEventListener('beforeunload', function() {
+            if (animationId) {
+                cancelAnimationFrame(animationId);
+            }
+        });
+    </script>
+</body>
+</html>

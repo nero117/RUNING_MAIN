@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>输入系统调试测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #1a1a1a;
+            color: #ffffff;
+            margin: 0;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        
+        .test-area {
+            background-color: #2d2d2d;
+            border: 1px solid #444;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        
+        .key-status {
+            display: inline-block;
+            margin: 5px;
+            padding: 10px 15px;
+            background-color: #444;
+            border-radius: 4px;
+            min-width: 80px;
+            text-align: center;
+        }
+        
+        .key-pressed {
+            background-color: #4CAF50;
+            color: white;
+        }
+        
+        .instructions {
+            background-color: #333;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        
+        .log {
+            background-color: #1a1a1a;
+            border: 1px solid #444;
+            border-radius: 4px;
+            padding: 10px;
+            height: 200px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎮 输入系统调试测试</h1>
+        
+        <div class="instructions">
+            <h3>测试说明：</h3>
+            <p>按下以下按键来测试输入系统是否正常工作：</p>
+            <ul>
+                <li><strong>空格键</strong> - 跳跃</li>
+                <li><strong>Q键</strong> - 射击</li>
+                <li><strong>ESC键</strong> - 暂停</li>
+                <li><strong>R键</strong> - 重新开始</li>
+            </ul>
+        </div>
+        
+        <div class="test-area">
+            <h3>按键状态：</h3>
+            <div id="keyStatus">
+                <div class="key-status" id="space">空格键</div>
+                <div class="key-status" id="keyQ">Q键</div>
+                <div class="key-status" id="escape">ESC键</div>
+                <div class="key-status" id="keyR">R键</div>
+            </div>
+        </div>
+        
+        <div class="test-area">
+            <h3>事件日志：</h3>
+            <div class="log" id="eventLog"></div>
+        </div>
+        
+        <div class="test-area">
+            <h3>游戏状态测试：</h3>
+            <p>当前游戏状态: <span id="gameStatus">未知</span></p>
+            <p>玩家位置: <span id="playerPos">未知</span></p>
+            <p>玩家速度: <span id="playerVel">未知</span></p>
+            <p>是否在地面: <span id="playerGrounded">未知</span></p>
+            <p>是否可以跳跃: <span id="playerCanJump">未知</span></p>
+        </div>
+    </div>
+
+    <script>
+        // 日志函数
+        function log(message) {
+            const logElement = document.getElementById('eventLog');
+            const timestamp = new Date().toLocaleTimeString();
+            logElement.innerHTML += `[${timestamp}] ${message}<br>`;
+            logElement.scrollTop = logElement.scrollHeight;
+        }
+        
+        // 更新按键状态显示
+        function updateKeyStatus(keyId, pressed) {
+            const element = document.getElementById(keyId);
+            if (element) {
+                if (pressed) {
+                    element.classList.add('key-pressed');
+                } else {
+                    element.classList.remove('key-pressed');
+                }
+            }
+        }
+        
+        // 键盘事件监听
+        const keyMap = {
+            32: 'space',      // 空格键
+            81: 'keyQ',       // Q键
+            27: 'escape',     // ESC键
+            82: 'keyR'        // R键
+        };
+        
+        document.addEventListener('keydown', (event) => {
+            const keyId = keyMap[event.keyCode];
+            if (keyId) {
+                updateKeyStatus(keyId, true);
+                log(`按键按下: ${event.key} (${event.keyCode})`);
+                
+                // 阻止默认行为
+                event.preventDefault();
+            }
+        });
+        
+        document.addEventListener('keyup', (event) => {
+            const keyId = keyMap[event.keyCode];
+            if (keyId) {
+                updateKeyStatus(keyId, false);
+                log(`按键释放: ${event.key} (${event.keyCode})`);
+            }
+        });
+        
+        // 尝试获取游戏状态
+        function updateGameStatus() {
+            try {
+                if (window.gameEngine) {
+                    const gameEngine = window.gameEngine;
+                    const currentScene = gameEngine.sceneManager.getCurrentScene();
+                    
+                    document.getElementById('gameStatus').textContent = 
+                        currentScene ? currentScene.name : '无场景';
+                    
+                    if (currentScene && currentScene.getPlayer) {
+                        const player = currentScene.getPlayer();
+                        if (player) {
+                            document.getElementById('playerPos').textContent = 
+                                `(${Math.round(player.x)}, ${Math.round(player.y)})`;
+                            document.getElementById('playerVel').textContent = 
+                                `(${Math.round(player.velocityX)}, ${Math.round(player.velocityY)})`;
+                            document.getElementById('playerGrounded').textContent = 
+                                player.isGrounded ? '是' : '否';
+                            document.getElementById('playerCanJump').textContent = 
+                                player.canJump ? '是' : '否';
+                        }
+                    }
+                } else {
+                    document.getElementById('gameStatus').textContent = '游戏引擎未加载';
+                }
+            } catch (error) {
+                document.getElementById('gameStatus').textContent = '错误: ' + error.message;
+            }
+        }
+        
+        // 定期更新游戏状态
+        setInterval(updateGameStatus, 100);
+        
+        // 页面加载完成后的初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            log('输入系统调试测试已启动');
+            log('请按下空格键、Q键、ESC键或R键进行测试');
+            
+            // 检查是否有游戏引擎
+            setTimeout(() => {
+                if (window.gameEngine) {
+                    log('✅ 检测到游戏引擎');
+                } else {
+                    log('❌ 未检测到游戏引擎，请先启动主游戏');
+                }
+            }, 1000);
+        });
+    </script>
+</body>
+</html>

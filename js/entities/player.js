@@ -1,5 +1,5 @@
 /**
- * 玩家角色类
+ * 玩家角色类 - 美女角色版本
  */
 class Player extends Entity {
     constructor(x, y) {
@@ -34,6 +34,15 @@ class Player extends Entity {
         this.shootCooldownTime = GameConfig.SHOOT_COOLDOWN || 300; // 300毫秒冷却时间
         this.lastShootTime = 0;
         this.shootCallbacks = [];
+        
+        // 美女角色系统
+        this.characterAssets = new CharacterAssets();
+        this.characterEffects = new CharacterEffects(this);
+        
+        // 无敌状态管理
+        this.isInvincible = false;
+        this.invincibleTimeLeft = 0;
+        this.invincibleDuration = 0;
     }
     
     /**
@@ -60,8 +69,17 @@ class Player extends Entity {
         // 更新射击冷却时间
         this.updateShootCooldown(deltaTime);
         
+        // 更新无敌状态
+        this.updateInvincibility(deltaTime);
+        
         // 更新动画帧
         this.updateAnimation(deltaTime);
+        
+        // 更新美女角色动画
+        this.characterAssets.updateAnimation(this.animationState, deltaTime);
+        
+        // 更新角色特效
+        this.characterEffects.update(deltaTime);
     }
     
     /**
@@ -218,16 +236,20 @@ class Player extends Entity {
             this.shootCooldown = this.shootCooldownTime;
             this.canShoot = false;
             
+            // 添加射击特效
+            const shootPos = this.getShootPosition();
+            this.characterEffects.addSpecialEffect('shooting_spark', shootPos.x, shootPos.y);
+            
             // 触发射击回调
             this.shootCallbacks.forEach(callback => {
                 try {
-                    callback(this.getShootPosition());
+                    callback(shootPos);
                 } catch (error) {
                     console.error('射击回调执行错误:', error);
                 }
             });
             
-            console.log('玩家射击！');
+            console.log('美女角色射击！');
             return true;
         }
         
@@ -284,6 +306,61 @@ class Player extends Entity {
     }
     
     /**
+     * 设置无敌状态
+     * @param {number} duration - 无敌持续时间（秒）
+     */
+    setInvincible(duration) {
+        this.isInvincible = true;
+        this.invincibleDuration = duration;
+        this.invincibleTimeLeft = duration;
+        
+        // 激活视觉效果
+        this.characterEffects.activateInvincibilityEffect(duration);
+        
+        console.log(`✨ 美女角色进入华丽无敌状态，持续 ${duration} 秒 ✨`);
+    }
+    
+    /**
+     * 检查是否处于无敌状态
+     * @returns {boolean} 是否无敌
+     */
+    isInvincible() {
+        return this.isInvincible;
+    }
+    
+    /**
+     * 获取剩余无敌时间
+     * @returns {number} 剩余时间（秒）
+     */
+    getInvincibleTimeLeft() {
+        return Math.max(0, this.invincibleTimeLeft);
+    }
+    
+    /**
+     * 更新无敌状态
+     * @param {number} deltaTime - 时间增量
+     */
+    updateInvincibility(deltaTime) {
+        if (this.isInvincible) {
+            this.invincibleTimeLeft -= deltaTime;
+            
+            // 更新角色特效的剩余时间
+            this.characterEffects.invincibilityEffect.timeLeft = this.invincibleTimeLeft;
+            
+            // 无敌时间结束
+            if (this.invincibleTimeLeft <= 0) {
+                this.isInvincible = false;
+                this.invincibleTimeLeft = 0;
+                
+                // 停用视觉效果
+                this.characterEffects.deactivateInvincibilityEffect();
+                
+                console.log('💫 美女角色华丽无敌状态结束 💫');
+            }
+        }
+    }
+    
+    /**
      * 检查玩家是否在地面上
      * @returns {boolean} 是否在地面上
      */
@@ -310,329 +387,125 @@ class Player extends Entity {
      * @param {Renderer} renderer - 渲染器
      */
     render(renderer) {
-        // 根据动画状态渲染不同的视觉效果
-        this.renderAnimatedPlayer(renderer);
+        // 根据动画状态计算缩放和偏移
+        let scale = 1.0;
+        let glowScale = 1.0;
+        
+        switch (this.animationState) {
+            case 'jumping':
+                scale = 1.05;
+                glowScale = 1.1;
+                break;
+            case 'falling':
+                scale = 0.95;
+                glowScale = 0.9;
+                break;
+            default:
+                scale = 1.0;
+                glowScale = 1.0;
+        }
+        
+        // 如果处于无敌状态，增加额外的视觉效果
+        if (this.isInvincible) {
+            scale *= 1.02; // 轻微放大
+            glowScale *= 1.15;
+            
+            // 添加无敌状态的角色轮廓发光
+            renderer.save();
+            renderer.ctx.shadowColor = '#ff69b4';
+            renderer.ctx.shadowBlur = 8 * this.characterEffects.getGlowIntensity();
+            
+            // 渲染美女角色（带发光效果）
+            this.characterAssets.renderCharacter(
+                renderer, 
+                this.x, 
+                this.y, 
+                this.animationState, 
+                scale
+            );
+            
+            renderer.restore();
+        } else {
+            // 正常渲染美女角色
+            this.characterAssets.renderCharacter(
+                renderer, 
+                this.x, 
+                this.y, 
+                this.animationState, 
+                scale
+            );
+        }
+        
+        // 渲染美女角色特效（在角色上面，更显眼）
+        renderer.save();
+        if (this.isInvincible) {
+            renderer.ctx.globalCompositeOperation = 'screen'; // 使用屏幕混合模式让效果更亮
+        }
+        this.characterEffects.render(renderer);
+        renderer.restore();
+        
+        // 渲染跑步粒子效果
+        if (this.animationState === 'running' && this.isGrounded) {
+            this.renderRunningEffects(renderer);
+        }
+        
+        // 着陆时的尘土效果
+        if (this.isGrounded && this.velocityY > 100) {
+            this.characterEffects.addSpecialEffect('landing_dust', this.x + this.width/2, this.y + this.height);
+        }
+        
+        // 无敌状态的额外视觉提示
+        if (this.isInvincible) {
+            this.renderInvincibilityIndicator(renderer);
+        }
         
         // 可选：显示调试信息
         if (GameConfig.DEBUG) {
             this.renderDebugInfo(renderer);
+            this.renderCenterIndicator(renderer);
         }
     }
     
     /**
-     * 渲染动画化的玩家
+     * 渲染无敌状态指示器
      * @param {Renderer} renderer - 渲染器
      */
-    renderAnimatedPlayer(renderer) {
-        let offsetY = 0, scale = 1.0;
+    renderInvincibilityIndicator(renderer) {
+        const centerX = this.x + this.width / 2;
+        const centerY = this.y - 15;
+        const timeLeft = Math.ceil(this.invincibleTimeLeft);
         
-        // 根据动画状态设置视觉效果
-        switch (this.animationState) {
-            case 'running':
-                // 奔跑动画：轻微的上下摆动
-                offsetY = Math.sin(this.animationFrame * Math.PI * 2) * 1;
-                scale = 1.0;
-                break;
-            case 'jumping':
-                // 跳跃动画：稍微拉伸
-                scale = 1.05;
-                offsetY = -2;
-                break;
-            case 'falling':
-                // 下落动画：稍微压缩
-                scale = 0.95;
-                offsetY = 1;
-                break;
-            default:
-                scale = 1.0;
-        }
-        
-        // 计算基础位置
-        const baseX = this.x;
-        const baseY = this.y + offsetY;
-        
-        // 绘制卡通人物
-        this.renderCartoonCharacter(renderer, baseX, baseY, scale);
-        
-        // 绘制跑步粒子效果
-        if (this.animationState === 'running' && this.isGrounded) {
-            this.renderRunningEffects(renderer, baseX, baseY);
-        }
-        
-        // 绘制中心线指示器（显示玩家在屏幕中间）
-        this.renderCenterIndicator(renderer);
-        
-        // 添加简单的动画效果指示器
-        if (GameConfig.DEBUG) {
-            this.renderAnimationIndicator(renderer);
-        }
-    }
-    
-    /**
-     * 渲染卡通人物
-     * @param {Renderer} renderer - 渲染器
-     * @param {number} x - X坐标
-     * @param {number} y - Y坐标
-     * @param {number} scale - 缩放比例
-     */
-    renderCartoonCharacter(renderer, x, y, scale) {
-        const centerX = x + this.width / 2;
-        const bottomY = y + this.height;
-        
-        // 动画参数
-        const runCycle = this.animationFrame * 2; // 加快动画速度
-        const armSwing = Math.sin(runCycle) * 3;
-        const legSwing = Math.sin(runCycle + Math.PI) * 4;
-        
-        // 保存渲染状态
-        renderer.save();
-        
-        // 应用缩放
-        if (scale !== 1.0) {
-            renderer.ctx.translate(centerX, bottomY);
-            renderer.ctx.scale(scale, scale);
-            renderer.ctx.translate(-centerX, -bottomY);
-        }
-        
-        // 1. 绘制腿部（在身体后面）
-        this.renderLegs(renderer, centerX, bottomY, legSwing);
-        
-        // 2. 绘制身体
-        this.renderBody(renderer, centerX, bottomY);
-        
-        // 3. 绘制手臂
-        this.renderArms(renderer, centerX, bottomY, armSwing);
-        
-        // 4. 绘制头部
-        this.renderHead(renderer, centerX, bottomY);
-        
-        // 5. 绘制面部表情
-        this.renderFace(renderer, centerX, bottomY);
-        
-        // 恢复渲染状态
-        renderer.restore();
-    }
-    
-    /**
-     * 渲染腿部
-     * @param {Renderer} renderer - 渲染器
-     * @param {number} centerX - 中心X坐标
-     * @param {number} bottomY - 底部Y坐标
-     * @param {number} swing - 摆动幅度
-     */
-    renderLegs(renderer, centerX, bottomY, swing) {
-        const legWidth = 4;
-        const legHeight = 12;
-        const legSpacing = 3;
-        
-        // 左腿
-        const leftLegX = centerX - legSpacing;
-        const leftLegY = bottomY - legHeight;
-        const leftLegOffset = this.animationState === 'running' ? swing : 0;
-        
-        renderer.fillRect(
-            leftLegX - legWidth/2 + leftLegOffset * 0.3,
-            leftLegY,
-            legWidth,
-            legHeight,
-            '#2c3e50'
-        );
-        
-        // 右腿
-        const rightLegX = centerX + legSpacing;
-        const rightLegY = bottomY - legHeight;
-        const rightLegOffset = this.animationState === 'running' ? -swing : 0;
-        
-        renderer.fillRect(
-            rightLegX - legWidth/2 + rightLegOffset * 0.3,
-            rightLegY,
-            legWidth,
-            legHeight,
-            '#2c3e50'
-        );
-        
-        // 脚部
-        if (this.animationState === 'running') {
-            // 左脚
-            renderer.fillRect(
-                leftLegX - legWidth/2 + leftLegOffset * 0.3 - 2,
-                bottomY - 2,
-                legWidth + 4,
-                2,
-                '#34495e'
-            );
+        // 渲染剩余时间
+        if (timeLeft > 0) {
+            let textColor = '#ffff00';
+            if (timeLeft <= 3) {
+                textColor = Math.sin(Date.now() * 0.01) > 0 ? '#ff0000' : '#ffff00'; // 闪烁警告
+            }
             
-            // 右脚
-            renderer.fillRect(
-                rightLegX - legWidth/2 + rightLegOffset * 0.3 - 2,
-                bottomY - 2,
-                legWidth + 4,
-                2,
-                '#34495e'
-            );
+            renderer.save();
+            renderer.ctx.font = 'bold 14px Arial';
+            renderer.ctx.textAlign = 'center';
+            renderer.ctx.fillStyle = textColor;
+            renderer.ctx.strokeStyle = '#000000';
+            renderer.ctx.lineWidth = 2;
+            
+            const text = `✨${timeLeft}✨`;
+            renderer.ctx.strokeText(text, centerX, centerY);
+            renderer.ctx.fillText(text, centerX, centerY);
+            
+            renderer.restore();
         }
     }
     
-    /**
-     * 渲染身体
-     * @param {Renderer} renderer - 渲染器
-     * @param {number} centerX - 中心X坐标
-     * @param {number} bottomY - 底部Y坐标
-     */
-    renderBody(renderer, centerX, bottomY) {
-        const bodyWidth = 12;
-        const bodyHeight = 16;
-        const bodyX = centerX - bodyWidth / 2;
-        const bodyY = bottomY - bodyHeight - 12; // 腿部高度
-        
-        // 身体主体
-        renderer.fillRect(bodyX, bodyY, bodyWidth, bodyHeight, '#3498db');
-        
-        // 身体装饰（衣服细节）
-        renderer.fillRect(bodyX + 2, bodyY + 2, bodyWidth - 4, 2, '#2980b9');
-        renderer.fillRect(bodyX + 2, bodyY + 6, bodyWidth - 4, 1, '#2980b9');
-        
-        // 腰带
-        renderer.fillRect(bodyX, bodyY + bodyHeight - 3, bodyWidth, 2, '#e67e22');
-    }
-    
-    /**
-     * 渲染手臂
-     * @param {Renderer} renderer - 渲染器
-     * @param {number} centerX - 中心X坐标
-     * @param {number} bottomY - 底部Y坐标
-     * @param {number} swing - 摆动幅度
-     */
-    renderArms(renderer, centerX, bottomY, swing) {
-        const armWidth = 3;
-        const armLength = 10;
-        const shoulderY = bottomY - 24; // 身体顶部
-        
-        // 左臂
-        const leftArmX = centerX - 8;
-        const leftArmSwing = this.animationState === 'running' ? swing : 0;
-        
-        renderer.fillRect(
-            leftArmX,
-            shoulderY + leftArmSwing * 0.5,
-            armWidth,
-            armLength,
-            '#f39c12'
-        );
-        
-        // 左手
-        renderer.drawCircle(
-            leftArmX + armWidth/2,
-            shoulderY + armLength + leftArmSwing * 0.5,
-            2,
-            '#f39c12'
-        );
-        
-        // 右臂
-        const rightArmX = centerX + 5;
-        const rightArmSwing = this.animationState === 'running' ? -swing : 0;
-        
-        renderer.fillRect(
-            rightArmX,
-            shoulderY + rightArmSwing * 0.5,
-            armWidth,
-            armLength,
-            '#f39c12'
-        );
-        
-        // 右手
-        renderer.drawCircle(
-            rightArmX + armWidth/2,
-            shoulderY + armLength + rightArmSwing * 0.5,
-            2,
-            '#f39c12'
-        );
-    }
-    
-    /**
-     * 渲染头部
-     * @param {Renderer} renderer - 渲染器
-     * @param {number} centerX - 中心X坐标
-     * @param {number} bottomY - 底部Y坐标
-     */
-    renderHead(renderer, centerX, bottomY) {
-        const headRadius = 8;
-        const headY = bottomY - 32; // 身体顶部上方
-        
-        // 头部主体
-        renderer.drawCircle(centerX, headY, headRadius, '#f39c12');
-        
-        // 头发
-        renderer.drawCircle(centerX, headY - 2, headRadius - 1, '#8b4513');
-        
-        // 帽子（可选）
-        if (this.animationState === 'running') {
-            renderer.fillRect(
-                centerX - headRadius + 1,
-                headY - headRadius,
-                (headRadius - 1) * 2,
-                3,
-                '#e74c3c'
-            );
-        }
-    }
-    
-    /**
-     * 渲染面部表情
-     * @param {Renderer} renderer - 渲染器
-     * @param {number} centerX - 中心X坐标
-     * @param {number} bottomY - 底部Y坐标
-     */
-    renderFace(renderer, centerX, bottomY) {
-        const headY = bottomY - 32;
-        
-        // 眼睛
-        const eyeSize = 1.5;
-        const eyeOffset = 3;
-        
-        // 左眼
-        renderer.drawCircle(centerX - eyeOffset, headY - 2, eyeSize, '#2c3e50');
-        
-        // 右眼
-        renderer.drawCircle(centerX + eyeOffset, headY - 2, eyeSize, '#2c3e50');
-        
-        // 嘴巴 - 根据状态改变表情
-        let mouthY = headY + 2;
-        let mouthWidth = 4;
-        
-        switch (this.animationState) {
-            case 'running':
-                // 跑步时的专注表情
-                renderer.fillRect(centerX - mouthWidth/2, mouthY, mouthWidth, 1, '#2c3e50');
-                break;
-            case 'jumping':
-                // 跳跃时的兴奋表情
-                renderer.drawCircle(centerX, mouthY, 2, '#2c3e50');
-                break;
-            case 'falling':
-                // 下落时的紧张表情
-                renderer.fillRect(centerX - mouthWidth/2, mouthY + 1, mouthWidth, 1, '#2c3e50');
-                break;
-            default:
-                renderer.fillRect(centerX - mouthWidth/2, mouthY, mouthWidth, 1, '#2c3e50');
-        }
-        
-        // 腮红（跑步时）
-        if (this.animationState === 'running') {
-            renderer.drawCircle(centerX - 6, headY + 1, 1, 'rgba(231, 76, 60, 0.5)');
-            renderer.drawCircle(centerX + 6, headY + 1, 1, 'rgba(231, 76, 60, 0.5)');
-        }
-    }
+
     
     /**
      * 渲染跑步效果
      * @param {Renderer} renderer - 渲染器
-     * @param {number} x - X坐标
-     * @param {number} y - Y坐标
      */
-    renderRunningEffects(renderer, x, y) {
-        const footY = y + this.height;
-        const centerX = x + this.width / 2;
+    renderRunningEffects(renderer) {
+        const footY = this.y + this.height;
+        const centerX = this.x + this.width / 2;
         
         // 跑步灰尘效果
         const dustCount = 3;
@@ -651,7 +524,7 @@ class Player extends Entity {
         const speedLineCount = 2;
         for (let i = 0; i < speedLineCount; i++) {
             const lineX = centerX - 15 - i * 5;
-            const lineY = y + 10 + i * 8;
+            const lineY = this.y + 10 + i * 8;
             const lineLength = 8 + Math.random() * 4;
             
             renderer.setGlobalAlpha(0.6);
@@ -676,24 +549,7 @@ class Player extends Entity {
         }
     }
     
-    /**
-     * 渲染动画指示器
-     * @param {Renderer} renderer - 渲染器
-     */
-    renderAnimationIndicator(renderer) {
-        const currentFrame = this.getCurrentFrame();
-        const indicatorSize = 3;
-        const spacing = 5;
-        
-        // 在玩家上方显示动画帧指示器
-        for (let i = 0; i < this.currentFrameSet; i++) {
-            const indicatorX = this.x + i * spacing;
-            const indicatorY = this.y - 15;
-            const indicatorColor = i === currentFrame ? '#ffffff' : '#666666';
-            
-            renderer.drawRect(indicatorX, indicatorY, indicatorSize, indicatorSize, indicatorColor);
-        }
-    }
+
     
     /**
      * 渲染调试信息
@@ -710,5 +566,9 @@ class Player extends Entity {
                         this.x, this.y - 60, '#ffffff', '12px Arial');
         renderer.drawText(`Anim: ${animInfo.state} (${animInfo.frame}/${animInfo.totalFrames})`, 
                         this.x, this.y - 75, '#ffffff', '12px Arial');
+        renderer.drawText(`Invincible: ${this.isInvincible} (${Math.round(this.invincibleTimeLeft)}s)`, 
+                        this.x, this.y - 90, '#ffffff', '12px Arial');
+        renderer.drawText(`Character: Beauty Female`, 
+                        this.x, this.y - 105, '#ff69b4', '12px Arial');
     }
 }

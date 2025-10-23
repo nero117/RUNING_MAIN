@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Effect System Test Runner</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f0f0f0;
+        }
+        .test-container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .success { background-color: #d4edda; color: #155724; }
+        .error { background-color: #f8d7da; color: #721c24; }
+        .info { background-color: #d1ecf1; color: #0c5460; }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background-color: #0056b3; }
+        #console-output {
+            background-color: #000;
+            color: #00ff00;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            height: 300px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎨 效果系统单元测试</h1>
+    
+    <div class="test-container">
+        <h2>测试控制</h2>
+        <button onclick="runAllTests()">启动所有测试</button>
+        <button onclick="clearOutput()">清除输出</button>
+    </div>
+    
+    <div class="test-container">
+        <h2>测试结果</h2>
+        <div id="test-results"></div>
+    </div>
+    
+    <div class="test-container">
+        <h2>控制台输出</h2>
+        <div id="console-output"></div>
+    </div>
+
+    <!-- 加载依赖 -->
+    <script src="js/config.js"></script>
+    <script src="js/systems/effectSystem.js"></script>
+    
+    <script>
+        // 控制台重定向
+        const consoleOutput = document.getElementById('console-output');
+        const originalLog = console.log;
+        const originalError = console.error;
+        
+        console.log = function(...args) {
+            originalLog.apply(console, args);
+            consoleOutput.textContent += args.join(' ') + '\n';
+            consoleOutput.scrollTop = consoleOutput.scrollHeight;
+        };
+        
+        console.error = function(...args) {
+            originalError.apply(console, args);
+            consoleOutput.textContent += 'ERROR: ' + args.join(' ') + '\n';
+            consoleOutput.scrollTop = consoleOutput.scrollHeight;
+        };
+        
+        function addTestResult(message, passed) {
+            const testResults = document.getElementById('test-results');
+            const div = document.createElement('div');
+            div.className = `status ${passed ? 'success' : 'error'}`;
+            div.textContent = message;
+            testResults.appendChild(div);
+        }
+        
+        function clearOutput() {
+            document.getElementById('test-results').innerHTML = '';
+            document.getElementById('console-output').textContent = '';
+        }
+        
+        function runAllTests() {
+            console.log('🎨 启动效果系统单元测试...\n');
+            clearOutput();
+            
+            let passed = 0;
+            let total = 0;
+            
+            function test(name, testFn) {
+                total++;
+                try {
+                    testFn();
+                    console.log(`✅ ${name}`);
+                    addTestResult(`✅ ${name}`, true);
+                    passed++;
+                } catch (error) {
+                    console.log(`❌ ${name}: ${error.message}`);
+                    addTestResult(`❌ ${name}: ${error.message}`, false);
+                }
+            }
+            
+            // 测试 1: 效果系统实例化
+            test('效果系统可以实例化', () => {
+                const effectSystem = new EffectSystem();
+                if (!effectSystem) throw new Error('无法创建 EffectSystem 实例');
+                if (!Array.isArray(effectSystem.effects)) throw new Error('effects 属性不是数组');
+                if (effectSystem.effects.length !== 0) throw new Error('初始 effects 数组应为空');
+            });
+            
+            // 测试 2: 爆炸效果创建
+            test('爆炸效果创建', () => {
+                const effectSystem = new EffectSystem();
+                const explosion = effectSystem.addExplosion(100, 100);
+                
+                if (!explosion) throw new Error('爆炸效果创建失败');
+                if (explosion.type !== effectSystem.effectTypes.EXPLOSION) throw new Error('效果类型错误');
+                if (!explosion.particles || explosion.particles.length === 0) throw new Error('粒子未创建');
+                if (effectSystem.getActiveEffectCount() !== 1) throw new Error('活跃效果数量错误');
+            });
+            
+            // 测试 3: 摧毁效果创建
+            test('摧毁效果创建', () => {
+                const effectSystem = new EffectSystem();
+                const destruction = effectSystem.addDestruction(200, 200);
+                
+                if (!destruction) throw new Error('摧毁效果创建失败');
+                if (destruction.type !== effectSystem.effectTypes.DESTRUCTION) throw new Error('效果类型错误');
+                if (!destruction.particles || destruction.particles.length === 0) throw new Error('粒子未创建');
+            });
+            
+            // 测试 4: 粒子爆发效果创建
+            test('粒子爆发效果创建', () => {
+                const effectSystem = new EffectSystem();
+                const particleBurst = effectSystem.addParticleBurst(300, 300);
+                
+                if (!particleBurst) throw new Error('粒子爆发效果创建失败');
+                if (particleBurst.type !== effectSystem.effectTypes.PARTICLE_BURST) throw new Error('效果类型错误');
+                if (!particleBurst.particles || particleBurst.particles.length === 0) throw new Error('粒子未创建');
+            });
+            
+            // 测试 5: 得分弹出效果创建
+            test('得分弹出效果创建', () => {
+                const effectSystem = new EffectSystem();
+                const scorePopup = effectSystem.addScorePopup(400, 400, 100);
+                
+                if (!scorePopup) throw new Error('得分弹出效果创建失败');
+                if (scorePopup.type !== effectSystem.effectTypes.SCORE_POPUP) throw new Error('效果类型错误');
+                if (scorePopup.score !== 100) throw new Error('得分数值错误');
+            });
+            
+            // 测试 6: 效果ID唯一性
+            test('效果ID唯一性', () => {
+                const effectSystem = new EffectSystem();
+                const effect1 = effectSystem.addExplosion(100, 100);
+                const effect2 = effectSystem.addExplosion(100, 100);
+                
+                if (effect1.id === effect2.id) throw new Error('效果ID不唯一');
+            });
+            
+            // 测试 7: 效果更新逻辑
+            test('效果更新逻辑', () => {
+                const effectSystem = new EffectSystem();
+                const explosion = effectSystem.addExplosion(100, 100);
+                const initialAlpha = explosion.alpha;
+                
+                effectSystem.update(0.1); // 100ms
+                
+                if (explosion.alpha >= initialAlpha) throw new Error('效果透明度未衰减');
+                
+                // 检查粒子位置更新
+                const particle = explosion.particles[0];
+                const initialX = particle.x;
+                const initialY = particle.y;
+                
+                effectSystem.update(0.1);
+                
+                if (particle.x === initialX && particle.y === initialY) {
+                    throw new Error('粒子位置未更新');
+                }
+            });
+            
+            // 测试 8: 得分弹出向上移动
+            test('得分弹出向上移动', () => {
+                const effectSystem = new EffectSystem();
+                const scorePopup = effectSystem.addScorePopup(200, 200, 50);
+                const initialY = scorePopup.y;
+                
+                effectSystem.update(0.1);
+                
+                if (scorePopup.y >= initialY) throw new Error('得分弹出未向上移动');
+            });
+            
+            // 测试 9: 粒子生命衰减
+            test('粒子生命衰减', () => {
+                const effectSystem = new EffectSystem();
+                const explosion = effectSystem.addExplosion(100, 100);
+                const particle = explosion.particles[0];
+                const initialLife = particle.life;
+                
+                effectSystem.update(0.1);
+                
+                if (particle.life >= initialLife) throw new Error('粒子生命未衰减');
+            });
+            
+            // 测试 10: 粒子大小缩小
+            test('粒子大小缩小', () => {
+                const effectSystem = new EffectSystem();
+                const explosion = effectSystem.addExplosion(100, 100);
+                const particle = explosion.particles[0];
+                const initialSize = particle.size;
+                
+                effectSystem.update(0.1);
+                
+                if (particle.size >= initialSize) throw new Error('粒子大小未缩小');
+            });
+            
+            // 测试 11: 效果清理
+            test('效果清理功能', () => {
+                const effectSystem = new EffectSystem();
+                const effect1 = effectSystem.addExplosion(100, 100);
+                const effect2 = effectSystem.addExplosion(200, 200);
+                
+                const removed = effectSystem.removeEffectById(effect1.id);
+                
+                if (!removed) throw new Error('效果移除失败');
+                if (effectSystem.getActiveEffectCount() !== 1) throw new Error('移除后活跃效果数量错误');
+            });
+            
+            // 测试 12: 清除所有效果
+            test('清除所有效果', () => {
+                const effectSystem = new EffectSystem();
+                effectSystem.addExplosion(100, 100);
+                effectSystem.addDestruction(200, 200);
+                effectSystem.addParticleBurst(300, 300);
+                
+                effectSystem.clearAllEffects();
+                
+                if (effectSystem.getActiveEffectCount() !== 0) throw new Error('未清除所有效果');
+            });
+            
+            // 测试 13: 最大效果数量限制
+            test('最大效果数量限制', () => {
+                const effectSystem = new EffectSystem();
+                const maxEffects = effectSystem.maxEffects;
+                
+                // 创建超过最大数量的效果
+                for (let i = 0; i < maxEffects + 5; i++) {
+                    effectSystem.addExplosion(i * 10, 100);
+                }
+                
+                if (effectSystem.getActiveEffectCount() > maxEffects) {
+                    throw new Error('最大效果数量限制未生效');
+                }
+            });
+            
+            // 测试 14: 按类型获取效果数量
+            test('按类型获取效果数量', () => {
+                const effectSystem = new EffectSystem();
+                effectSystem.addExplosion(100, 100);
+                effectSystem.addExplosion(200, 200);
+                effectSystem.addDestruction(300, 300);
+                
+                const explosionCount = effectSystem.getEffectCountByType(effectSystem.effectTypes.EXPLOSION);
+                const destructionCount = effectSystem.getEffectCountByType(effectSystem.effectTypes.DESTRUCTION);
+                
+                if (explosionCount !== 2) throw new Error(`期望2个爆炸效果，实际${explosionCount}个`);
+                if (destructionCount !== 1) throw new Error(`期望1个摧毁效果，实际${destructionCount}个`);
+            });
+            
+            // 测试 15: 统计信息跟踪
+            test('统计信息跟踪', () => {
+                const effectSystem = new EffectSystem();
+                const initialStats = effectSystem.getStats();
+                
+                effectSystem.addExplosion(100, 100);
+                effectSystem.addDestruction(200, 200);
+                
+                const updatedStats = effectSystem.getStats();
+                
+                if (updatedStats.totalCreated <= initialStats.totalCreated) {
+                    throw new Error('总创建数量未更新');
+                }
+                if (updatedStats.activeEffects !== 2) {
+                    throw new Error('活跃效果数量错误');
+                }
+            });
+            
+            // 测试 16: 自动清理完成的效果
+            test('自动清理完成的效果', () => {
+                const effectSystem = new EffectSystem();
+                const shortEffect = effectSystem.addExplosion(100, 100, { duration: 0.01 }); // 10ms持续时间
+                
+                // 等待效果完成
+                setTimeout(() => {
+                    effectSystem.update(0.1);
+                    
+                    if (effectSystem.getActiveEffectCount() !== 0) {
+                        addTestResult('❌ 自动清理完成的效果: 完成的效果未被清理', false);
+                    } else {
+                        addTestResult('✅ 自动清理完成的效果', true);
+                        passed++;
+                    }
+                    total++;
+                    
+                    // 显示最终结果
+                    setTimeout(() => {
+                        console.log(`\n🎉 测试结果: ${passed}/${total} 个测试通过`);
+                        console.log(`成功率: ${Math.round((passed / total) * 100)}%`);
+                        
+                        if (passed === total) {
+                            console.log('✅ 所有测试通过！效果系统单元测试完成。');
+                            addTestResult('🎉 所有测试通过！效果系统单元测试完成。', true);
+                        } else {
+                            console.log('❌ 部分测试失败！');
+                            addTestResult('❌ 部分测试失败！', false);
+                        }
+                    }, 100);
+                }, 50);
+            });
+            
+            console.log(`\n⏳ 运行中... (包含异步测试)`);
+        }
+        
+        // 页面加载完成后自动运行测试
+        window.addEventListener('load', function() {
+            console.log('效果系统单元测试页面已加载');
+            console.log('点击"启动所有测试"按钮开始测试');
+        });
+    </script>
+</body>
+</html>

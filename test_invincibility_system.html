@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>无敌状态系统测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #2c3e50;
+            color: white;
+        }
+        .test-container {
+            background: #34495e;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .status-display {
+            font-size: 24px;
+            text-align: center;
+            padding: 20px;
+            background: #27ae60;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin: 20px 0;
+        }
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        button:hover { background-color: #2980b9; }
+        button.special { background-color: #e74c3c; }
+        button.special:hover { background-color: #c0392b; }
+        .canvas-container {
+            text-align: center;
+            margin: 20px 0;
+        }
+        canvas {
+            border: 2px solid #555;
+            background: linear-gradient(to bottom, #87CEEB, #4682B4);
+        }
+        .log {
+            background: #000;
+            color: #00ff00;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            height: 150px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <h1>🛡️ 无敌状态系统测试</h1>
+    
+    <div class="test-container">
+        <h2>功能说明</h2>
+        <ul>
+            <li><strong>彩色漂浮障碍物</strong>: 射击后激活10秒无敌状态</li>
+            <li><strong>无敌效果</strong>: 发光光环、闪烁警告、进度条显示</li>
+            <li><strong>碰撞忽略</strong>: 无敌期间忽略所有障碍物碰撞</li>
+            <li><strong>视觉反馈</strong>: 彩色循环、粒子效果、激活动画</li>
+        </ul>
+    </div>
+    
+    <div class="status-display" id="status-display">
+        无敌状态: 未激活
+    </div>
+    
+    <div class="canvas-container">
+        <canvas id="test-canvas" width="400" height="300"></canvas>
+    </div>
+    
+    <div class="test-container">
+        <h2>测试控制</h2>
+        <div class="controls">
+            <button onclick="activateInvincibility()">激活无敌状态 (10秒)</button>
+            <button onclick="activateShortInvincibility()">激活短无敌 (3秒)</button>
+            <button onclick="deactivateInvincibility()">取消无敌状态</button>
+            <button onclick="testSpecialObstacle()" class="special">测试彩色障碍物</button>
+            <button onclick="resetSystem()">重置系统</button>
+            <button onclick="toggleDebug()">切换调试模式</button>
+        </div>
+    </div>
+    
+    <div class="test-container">
+        <h2>测试日志</h2>
+        <div class="log" id="test-log"></div>
+    </div>
+    
+    <!-- 加载必要的脚本 -->
+    <script src="js/config.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/renderer.js"></script>
+    <script src="js/entities/entity.js"></script>
+    <script src="js/entities/obstacle.js"></script>
+    <script src="js/systems/invincibilitySystem.js"></script>
+    
+    <script>
+        // 创建测试环境
+        const canvas = document.getElementById('test-canvas');
+        const renderer = new Renderer(canvas);
+        const invincibilitySystem = new InvincibilitySystem();
+        
+        // 创建测试障碍物
+        let testObstacle = null;
+        let debugMode = false;
+        
+        // 模拟玩家对象
+        const mockPlayer = {
+            x: 150,
+            y: 200,
+            width: 30,
+            height: 40,
+            getBounds() {
+                return { x: this.x, y: this.y, width: this.width, height: this.height };
+            }
+        };
+        
+        // 更新状态显示
+        function updateStatusDisplay() {
+            const display = document.getElementById('status-display');
+            const info = invincibilitySystem.getInvincibilityInfo();
+            
+            if (info.isInvincible) {
+                const remainingSeconds = info.remainingSeconds;
+                display.innerHTML = `
+                    🛡️ 无敌状态: ${remainingSeconds}秒剩余 
+                    ${info.isWarning ? '⚠️ 即将结束' : ''}
+                `;
+                display.style.backgroundColor = info.isWarning ? '#e74c3c' : '#27ae60';
+            } else {
+                display.innerHTML = '无敌状态: 未激活';
+                display.style.backgroundColor = '#34495e';
+            }
+        }
+        
+        // 记录日志
+        function log(message) {
+            const logElement = document.getElementById('test-log');
+            const timestamp = new Date().toLocaleTimeString();
+            logElement.textContent += `[${timestamp}] ${message}\n`;
+            logElement.scrollTop = logElement.scrollHeight;
+        }
+        
+        // 激活无敌状态
+        function activateInvincibility() {
+            invincibilitySystem.activate(10000);
+            log('激活10秒无敌状态');
+        }
+        
+        // 激活短无敌状态
+        function activateShortInvincibility() {
+            invincibilitySystem.activate(3000);
+            log('激活3秒无敌状态');
+        }
+        
+        // 取消无敌状态
+        function deactivateInvincibility() {
+            invincibilitySystem.deactivate();
+            log('无敌状态已取消');
+        }
+        
+        // 测试特殊障碍物
+        function testSpecialObstacle() {
+            // 创建特殊彩色障碍物
+            testObstacle = new Obstacle(250, 150, 'floating_special');
+            log('创建了彩色特殊障碍物');
+            
+            // 模拟射击击中
+            setTimeout(() => {
+                if (testObstacle && testObstacle.isSpecialObstacle()) {
+                    invincibilitySystem.activate(10000);
+                    log('🌟 射击彩色障碍物，激活无敌状态！');
+                    testObstacle = null; // 移除障碍物
+                }
+            }, 1000);
+        }
+        
+        // 重置系统
+        function resetSystem() {
+            invincibilitySystem.reset();
+            testObstacle = null;
+            log('系统已重置');
+        }
+        
+        // 切换调试模式
+        function toggleDebug() {
+            debugMode = !debugMode;
+            log(`调试模式: ${debugMode ? '开启' : '关闭'}`);
+        }
+        
+        // 渲染循环
+        function render() {
+            // 清空画布
+            renderer.clear();
+            
+            // 绘制背景
+            renderer.fillRect(0, 0, canvas.width, canvas.height, 'rgba(135, 206, 235, 0.3)');
+            
+            // 渲染无敌效果（在玩家后面）
+            invincibilitySystem.renderPlayerEffect(renderer, mockPlayer);
+            
+            // 渲染模拟玩家
+            const playerColor = invincibilitySystem.isPlayerInvincible() ? '#ffff00' : '#3498db';
+            renderer.fillRect(mockPlayer.x, mockPlayer.y, mockPlayer.width, mockPlayer.height, playerColor);
+            renderer.drawRect(mockPlayer.x, mockPlayer.y, mockPlayer.width, mockPlayer.height, '#ffffff', 2);
+            
+            // 渲染玩家标识
+            renderer.drawText('玩家', mockPlayer.x + 5, mockPlayer.y + 25, '#ffffff', '12px Arial');
+            
+            // 渲染无敌激活效果（在玩家前面）
+            invincibilitySystem.renderActivationEffect(renderer, mockPlayer);
+            
+            // 渲染测试障碍物
+            if (testObstacle) {
+                testObstacle.render(renderer);
+            }
+            
+            // 渲染无敌状态UI
+            invincibilitySystem.renderUI(renderer);
+            
+            // 调试信息
+            if (debugMode) {
+                const stats = invincibilitySystem.getStats();
+                let y = 20;
+                const lineHeight = 15;
+                
+                renderer.drawText('调试信息:', 10, y, '#ffffff', '12px Arial');
+                y += lineHeight;
+                
+                renderer.drawText(`无敌状态: ${stats.isInvincible}`, 10, y, '#ffffff', '10px Arial');
+                y += lineHeight;
+                
+                renderer.drawText(`剩余时间: ${stats.remainingSeconds}s`, 10, y, '#ffffff', '10px Arial');
+                y += lineHeight;
+                
+                renderer.drawText(`激活效果: ${stats.activationEffectActive}`, 10, y, '#ffffff', '10px Arial');
+                y += lineHeight;
+                
+                renderer.drawText(`粒子数量: ${stats.particleCount}`, 10, y, '#ffffff', '10px Arial');
+            }
+        }
+        
+        // 游戏循环
+        function gameLoop() {
+            // 更新无敌状态系统
+            invincibilitySystem.update(1/60); // 假设60fps
+            
+            // 更新测试障碍物
+            if (testObstacle) {
+                testObstacle.update(1/60);
+            }
+            
+            // 渲染
+            render();
+            
+            // 更新状态显示
+            updateStatusDisplay();
+            
+            requestAnimationFrame(gameLoop);
+        }
+        
+        // 初始化
+        log('无敌状态系统测试已准备就绪');
+        log('点击按钮测试不同功能');
+        log('彩色障碍物会在1秒后自动被"射击"');
+        
+        // 启动游戏循环
+        gameLoop();
+        
+        // 键盘控制
+        document.addEventListener('keydown', (event) => {
+            switch (event.code) {
+                case 'Space':
+                    activateInvincibility();
+                    break;
+                case 'KeyI':
+                    activateShortInvincibility();
+                    break;
+                case 'KeyC':
+                    deactivateInvincibility();
+                    break;
+                case 'KeyS':
+                    testSpecialObstacle();
+                    break;
+                case 'KeyR':
+                    resetSystem();
+                    break;
+                case 'KeyD':
+                    toggleDebug();
+                    break;
+            }
+        });
+        
+        log('键盘控制: 空格=激活无敌, I=短无敌, C=取消, S=特殊障碍物, R=重置, D=调试');
+    </script>
+</body>
+</html>

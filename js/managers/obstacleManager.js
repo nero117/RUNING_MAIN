@@ -21,8 +21,9 @@ class ObstacleManager {
         
         // 漂浮障碍物类型权重
         this.floatingObstacleTypes = [
-            { type: 'floating', weight: 0.8 },
-            { type: 'floating_large', weight: 0.2 }
+            { type: 'floating', weight: 0.7 },
+            { type: 'floating_large', weight: 0.2 },
+            { type: 'floating_special', weight: 0.1 } // 10%概率生成特殊彩色障碍物
         ];
     }
     

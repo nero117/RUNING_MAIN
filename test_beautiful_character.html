@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>美女角色测试</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #2c3e50;
+            font-family: Arial, sans-serif;
+        }
+        
+        #testContainer {
+            text-align: center;
+        }
+        
+        #testCanvas {
+            border: 2px solid #34495e;
+            background-color: #87CEEB;
+            display: block;
+        }
+        
+        #testInfo {
+            color: white;
+            margin-top: 10px;
+        }
+        
+        .controls {
+            margin: 10px 0;
+        }
+        
+        button {
+            margin: 5px;
+            padding: 10px 20px;
+            font-size: 16px;
+            background-color: #ff69b4;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        
+        button:hover {
+            background-color: #ff1493;
+        }
+    </style>
+</head>
+<body>
+    <div id="testContainer">
+        <canvas id="testCanvas" width="800" height="400"></canvas>
+        <div class="controls">
+            <button onclick="testRunning()">奔跑动画</button>
+            <button onclick="testJumping()">跳跃动画</button>
+            <button onclick="testShooting()">射击动画</button>
+            <button onclick="testInvincibility()">无敌效果</button>
+        </div>
+        <div id="testInfo">
+            <p>美女角色测试 - 点击按钮测试不同动画状态</p>
+            <p>当前状态: <span id="currentState">奔跑</span></p>
+        </div>
+    </div>
+
+    <!-- 游戏模块 -->
+    <script src="js/config.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/physics.js"></script>
+    <script src="js/entities/entity.js"></script>
+    <script src="js/entities/characterAssets.js"></script>
+    <script src="js/entities/characterEffects.js"></script>
+    <script src="js/entities/player.js"></script>
+    <script src="js/renderer.js"></script>
+    
+    <script>
+        // 测试脚本
+        const canvas = document.getElementById('testCanvas');
+        const renderer = new Renderer(canvas);
+        const stateDisplay = document.getElementById('currentState');
+        
+        // 创建美女角色
+        const player = new Player(350, 300);
+        
+        let currentAnimation = 'running';
+        let animationTime = 0;
+        
+        // 渲染循环
+        function renderLoop() {
+            const deltaTime = 0.016; // 60 FPS
+            animationTime += deltaTime;
+            
+            // 清空画布
+            renderer.clear();
+            
+            // 绘制背景
+            renderer.drawBackground();
+            
+            // 更新角色动画
+            player.characterAssets.updateAnimation(currentAnimation, deltaTime);
+            
+            // 更新特效
+            player.characterEffects.update(deltaTime);
+            
+            // 渲染角色
+            player.characterAssets.renderCharacter(
+                renderer, 
+                player.x, 
+                player.y, 
+                currentAnimation, 
+                1.0
+            );
+            
+            // 渲染特效
+            player.characterEffects.render(renderer);
+            
+            // 显示动画信息
+            const animInfo = player.characterAssets.getAnimationParameters(currentAnimation);
+            renderer.drawText(
+                `动画: ${currentAnimation} | 帧: ${Math.floor(player.characterAssets.animationFrame)}`,
+                10, 10, '#ffffff', '16px Arial'
+            );
+            
+            renderer.drawText(
+                `时间: ${animationTime.toFixed(2)}s`,
+                10, 30, '#ffffff', '16px Arial'
+            );
+            
+            requestAnimationFrame(renderLoop);
+        }
+        
+        // 测试函数
+        function testRunning() {
+            currentAnimation = 'running';
+            stateDisplay.textContent = '奔跑';
+            player.characterEffects.deactivateInvincibilityEffect();
+        }
+        
+        function testJumping() {
+            currentAnimation = 'jumping';
+            stateDisplay.textContent = '跳跃';
+            player.characterEffects.deactivateInvincibilityEffect();
+        }
+        
+        function testShooting() {
+            currentAnimation = 'shooting';
+            stateDisplay.textContent = '射击';
+            player.characterEffects.deactivateInvincibilityEffect();
+        }
+        
+        function testInvincibility() {
+            currentAnimation = 'running';
+            stateDisplay.textContent = '无敌状态';
+            player.characterEffects.activateInvincibilityEffect(10);
+        }
+        
+        // 开始渲染
+        renderLoop();
+    </script>
+</body>
+</html>

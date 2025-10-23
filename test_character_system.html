@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>美女角色系统测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f0f0f0;
+        }
+        
+        .test-container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        
+        .test-result {
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 5px;
+        }
+        
+        .test-pass {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .test-fail {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .test-summary {
+            font-size: 18px;
+            font-weight: bold;
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 5px;
+        }
+        
+        .summary-pass {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        
+        .summary-fail {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        canvas {
+            border: 2px solid #333;
+            margin: 10px 0;
+            background: linear-gradient(to bottom, #87CEEB 0%, #98FB98 100%);
+        }
+        
+        .controls {
+            margin: 10px 0;
+        }
+        
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            border-radius: 5px;
+            background-color: #007bff;
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        
+        button:hover {
+            background-color: #0056b3;
+        }
+        
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        
+        .info-panel {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+            font-family: monospace;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎭 美女角色系统测试</h1>
+    
+    <div class="test-container">
+        <h2>📦 CharacterAssets 测试</h2>
+        <div id="assets-tests"></div>
+    </div>
+    
+    <div class="test-container">
+        <h2>✨ CharacterEffects 测试</h2>
+        <div id="effects-tests"></div>
+    </div>
+    
+    <div class="test-container">
+        <h2>👩 Player 集成测试</h2>
+        <div id="player-tests"></div>
+    </div>
+    
+    <div class="test-container">
+        <h2>🎨 视觉测试</h2>
+        <canvas id="testCanvas" width="400" height="300"></canvas>
+        <div class="controls">
+            <button onclick="testRunningAnimation()">测试奔跑动画</button>
+            <button onclick="testJumpingAnimation()">测试跳跃动画</button>
+            <button onclick="testShootingAnimation()">测试射击动画</button>
+            <button onclick="testInvincibilityEffect()">测试无敌效果</button>
+            <button onclick="clearCanvas()">清除画布</button>
+        </div>
+        <div class="info-panel" id="visualInfo">
+            点击按钮测试不同的动画和效果...
+        </div>
+    </div>
+    
+    <div id="test-summary" class="test-summary"></div>
+
+    <!-- 加载游戏配置 -->
+    <script src="js/config.js"></script>
+    
+    <!-- 加载基础类 -->
+    <script src="js/entities/entity.js"></script>
+    <script src="js/physics.js"></script>
+    <script src="js/renderer.js"></script>
+    
+    <!-- 加载角色系统 -->
+    <script src="js/entities/characterAssets.js"></script>
+    <script src="js/entities/characterEffects.js"></script>
+    <script src="js/entities/player.js"></script>
+
+    <script>
+        // 测试框架
+        class TestFramework {
+            constructor() {
+                this.tests = [];
+                this.passed = 0;
+                this.total = 0;
+            }
+            
+            test(name, testFn, containerId) {
+                this.total++;
+                const container = document.getElementById(containerId);
+                const resultDiv = document.createElement('div');
+                resultDiv.className = 'test-result';
+                
+                try {
+                    testFn();
+                    resultDiv.className += ' test-pass';
+                    resultDiv.innerHTML = `✅ ${name}`;
+                    this.passed++;
+                } catch (error) {
+                    resultDiv.className += ' test-fail';
+                    resultDiv.innerHTML = `❌ ${name}: ${error.message}`;
+                }
+                
+                container.appendChild(resultDiv);
+            }
+            
+            showSummary() {
+                const summaryDiv = document.getElementById('test-summary');
+                const successRate = Math.round((this.passed / this.total) * 100);
+                
+                summaryDiv.innerHTML = `
+                    🎉 测试结果: ${this.passed}/${this.total} 个测试通过<br>
+                    成功率: ${successRate}%<br>
+                    ${this.passed === this.total ? '✅ 所有测试通过！美女角色系统功能完整！' : '❌ 部分测试失败！'}
+                `;
+                
+                summaryDiv.className = 'test-summary ' + 
+                    (this.passed === this.total ? 'summary-pass' : 'summary-fail');
+            }
+        }
+        
+        // 初始化测试框架
+        const testFramework = new TestFramework();
+        
+        // 初始化渲染器和画布
+        const canvas = document.getElementById('testCanvas');
+        const renderer = new Renderer(canvas);
+        
+        // 全局测试变量
+        let testPlayer = null;
+        let testAssets = null;
+        let testEffects = null;
+        
+        // 运行所有测试
+        function runAllTests() {
+            console.log('🎭 开始美女角色系统测试...');
+            
+            // CharacterAssets 测试
+            testFramework.test('CharacterAssets 可以实例化', () => {
+                testAssets = new CharacterAssets();
+                if (!testAssets) throw new Error('无法创建 CharacterAssets 实例');
+                if (!testAssets.animations) throw new Error('animations 属性未定义');
+                if (!testAssets.appearance) throw new Error('appearance 属性未定义');
+            }, 'assets-tests');
+            
+            testFramework.test('动画配置正确初始化', () => {
+                const requiredAnimations = ['running', 'jumping', 'shooting'];
+                requiredAnimations.forEach(anim => {
+                    if (!testAssets.animations[anim]) throw new Error(`缺少 ${anim} 动画配置`);
+                    if (typeof testAssets.animations[anim].frames !== 'number') throw new Error(`${anim} 帧数配置错误`);
+                    if (typeof testAssets.animations[anim].speed !== 'number') throw new Error(`${anim} 速度配置错误`);
+                });
+            }, 'assets-tests');
+            
+            testFramework.test('美女角色外观配置完整', () => {
+                const requiredColors = ['skinColor', 'hairColor', 'topColor', 'bottomColor', 'eyeColor', 'lipColor'];
+                requiredColors.forEach(color => {
+                    if (!testAssets.appearance[color]) throw new Error(`缺少 ${color} 颜色配置`);
+                    if (typeof testAssets.appearance[color] !== 'string') throw new Error(`${color} 颜色配置类型错误`);
+                });
+            }, 'assets-tests');
+            
+            testFramework.test('动画状态更新功能', () => {
+                const initialState = testAssets.currentAnimation;
+                testAssets.updateAnimation('jumping', 0.1);
+                
+                if (testAssets.currentAnimation === initialState && initialState !== 'jumping') {
+                    throw new Error('动画状态未更新');
+                }
+                if (testAssets.animationTime <= 0) throw new Error('动画时间未更新');
+            }, 'assets-tests');
+            
+            testFramework.test('动画帧计算正确', () => {
+                testAssets.updateAnimation('running', 0.5);
+                const frame = testAssets.getCurrentFrame();
+                if (typeof frame !== 'number') throw new Error('动画帧类型错误');
+                if (frame < 0) throw new Error('动画帧不能为负数');
+                if (frame >= testAssets.animations.running.frames) throw new Error('动画帧超出范围');
+            }, 'assets-tests');
+            
+            // CharacterEffects 测试
+            testFramework.test('CharacterEffects 可以实例化', () => {
+                const mockPlayer = { getBounds: () => ({ x: 100, y: 100, width: 24, height: 40 }) };
+                testEffects = new CharacterEffects(mockPlayer);
+                
+                if (!testEffects) throw new Error('无法创建 CharacterEffects 实例');
+                if (!testEffects.player) throw new Error('player 引用未设置');
+                if (!testEffects.invincibilityEffect) throw new Error('invincibilityEffect 未初始化');
+            }, 'effects-tests');
+            
+            testFramework.test('无敌状态效果激活', () => {
+                testEffects.activateInvincibilityEffect(5.0);
+                
+                if (!testEffects.invincibilityEffect.active) throw new Error('无敌状态未激活');
+                if (testEffects.invincibilityEffect.duration !== 5.0) throw new Error('无敌持续时间设置错误');
+                if (testEffects.invincibilityEffect.sparkleParticles.length === 0) throw new Error('激活爆发粒子未创建');
+            }, 'effects-tests');
+            
+            testFramework.test('无敌状态效果停用', () => {
+                testEffects.activateInvincibilityEffect(3.0);
+                testEffects.deactivateInvincibilityEffect();
+                
+                if (testEffects.invincibilityEffect.active) throw new Error('无敌状态未停用');
+                if (testEffects.invincibilityEffect.sparkleParticles.length > 0) throw new Error('粒子未清理');
+            }, 'effects-tests');
+            
+            testFramework.test('闪烁粒子生成', () => {
+                testEffects.activateInvincibilityEffect(2.0);
+                const initialParticleCount = testEffects.invincibilityEffect.sparkleParticles.length;
+                
+                testEffects.addSparkleParticle();
+                
+                if (testEffects.invincibilityEffect.sparkleParticles.length <= initialParticleCount) {
+                    throw new Error('闪烁粒子未添加');
+                }
+            }, 'effects-tests');
+            
+            testFramework.test('发光强度计算', () => {
+                testEffects.activateInvincibilityEffect(2.0);
+                testEffects.update(0.1);
+                
+                const intensity = testEffects.getGlowIntensity();
+                if (typeof intensity !== 'number') throw new Error('发光强度类型错误');
+                if (intensity < 0 || intensity > 1) throw new Error('发光强度超出范围 [0,1]');
+            }, 'effects-tests');
+            
+            // Player 集成测试
+            testFramework.test('Player 美女角色系统集成', () => {
+                testPlayer = new Player(100, 100);
+                
+                if (!testPlayer.characterAssets) throw new Error('CharacterAssets 未集成');
+                if (!testPlayer.characterEffects) throw new Error('CharacterEffects 未集成');
+                if (!(testPlayer.characterAssets instanceof CharacterAssets)) throw new Error('CharacterAssets 类型错误');
+                if (!(testPlayer.characterEffects instanceof CharacterEffects)) throw new Error('CharacterEffects 类型错误');
+            }, 'player-tests');
+            
+            testFramework.test('Player 无敌状态设置', () => {
+                testPlayer.setInvincible(3.0);
+                
+                if (!testPlayer.isInvincible) throw new Error('Player 无敌状态未设置');
+                if (testPlayer.getInvincibleTimeLeft() <= 0) throw new Error('无敌时间未设置');
+                if (!testPlayer.characterEffects.hasInvincibilityEffect()) throw new Error('视觉效果未激活');
+            }, 'player-tests');
+            
+            testFramework.test('Player 射击功能', () => {
+                testPlayer = new Player(100, 100);
+                let shootCallbackCalled = false;
+                
+                testPlayer.onShoot(() => {
+                    shootCallbackCalled = true;
+                });
+                
+                const shootResult = testPlayer.shoot();
+                
+                if (!shootResult) throw new Error('射击功能失败');
+                if (!shootCallbackCalled) throw new Error('射击回调未触发');
+                if (testPlayer.canShootNow()) throw new Error('射击冷却未生效');
+            }, 'player-tests');
+            
+            testFramework.test('Player 动画状态同步', () => {
+                testPlayer = new Player(100, 100);
+                
+                // 模拟跳跃
+                testPlayer.jump();
+                testPlayer.update(0.1);
+                
+                if (testPlayer.animationState === 'running') throw new Error('跳跃时动画状态未更新');
+            }, 'player-tests');
+            
+            // 显示测试结果
+            testFramework.showSummary();
+        }
+        
+        // 视觉测试函数
+        function testRunningAnimation() {
+            clearCanvas();
+            if (!testPlayer) testPlayer = new Player(150, 200);
+            
+            testPlayer.animationState = 'running';
+            testPlayer.characterAssets.updateAnimation('running', 0.5);
+            testPlayer.render(renderer);
+            
+            updateVisualInfo('奔跑动画测试 - 美女角色正在奔跑');
+        }
+        
+        function testJumpingAnimation() {
+            clearCanvas();
+            if (!testPlayer) testPlayer = new Player(150, 200);
+            
+            testPlayer.animationState = 'jumping';
+            testPlayer.characterAssets.updateAnimation('jumping', 0.3);
+            testPlayer.render(renderer);
+            
+            updateVisualInfo('跳跃动画测试 - 美女角色正在跳跃');
+        }
+        
+        function testShootingAnimation() {
+            clearCanvas();
+            if (!testPlayer) testPlayer = new Player(150, 200);
+            
+            testPlayer.animationState = 'shooting';
+            testPlayer.characterAssets.updateAnimation('shooting', 0.8);
+            testPlayer.render(renderer);
+            
+            updateVisualInfo('射击动画测试 - 美女角色正在射击');
+        }
+        
+        function testInvincibilityEffect() {
+            clearCanvas();
+            if (!testPlayer) testPlayer = new Player(150, 200);
+            
+            testPlayer.setInvincible(5.0);
+            testPlayer.characterEffects.update(0.5);
+            testPlayer.render(renderer);
+            
+            updateVisualInfo('无敌效果测试 - 美女角色处于华丽无敌状态，带有发光和粒子效果');
+        }
+        
+        function clearCanvas() {
+            renderer.clear();
+        }
+        
+        function updateVisualInfo(text) {
+            document.getElementById('visualInfo').textContent = text;
+        }
+        
+        // 页面加载完成后运行测试
+        window.addEventListener('load', () => {
+            setTimeout(runAllTests, 100);
+        });
+    </script>
+</body>
+</html>

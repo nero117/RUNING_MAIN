@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>新得分系统测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #2c3e50;
+            color: white;
+        }
+        .test-container {
+            background: #34495e;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .score-display {
+            font-size: 24px;
+            text-align: center;
+            padding: 20px;
+            background: #27ae60;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin: 20px 0;
+        }
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        button:hover { background-color: #2980b9; }
+        button.shoot { background-color: #e74c3c; }
+        button.shoot:hover { background-color: #c0392b; }
+        .log {
+            background: #000;
+            color: #00ff00;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            height: 200px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎯 新得分系统测试</h1>
+    
+    <div class="test-container">
+        <h2>得分规则</h2>
+        <ul>
+            <li><strong>跳过小型障碍物</strong>: 10分</li>
+            <li><strong>跳过中型障碍物</strong>: 20分</li>
+            <li><strong>跳过大型障碍物</strong>: 30分</li>
+            <li><strong>射击漂浮障碍物</strong>: 30分 (带爆炸效果)</li>
+        </ul>
+    </div>
+    
+    <div class="score-display" id="score-display">
+        当前得分: 0
+    </div>
+    
+    <div class="test-container">
+        <h2>测试控制</h2>
+        <div class="controls">
+            <button onclick="testJumpScore('small')">跳过小型障碍物 (+10分)</button>
+            <button onclick="testJumpScore('medium')">跳过中型障碍物 (+20分)</button>
+            <button onclick="testJumpScore('large')">跳过大型障碍物 (+30分)</button>
+            <button onclick="testShootScore()" class="shoot">射击漂浮障碍物 (+30分)</button>
+            <button onclick="resetScore()">重置得分</button>
+            <button onclick="testCombo()">测试连击</button>
+        </div>
+    </div>
+    
+    <div class="test-container">
+        <h2>测试日志</h2>
+        <div class="log" id="test-log"></div>
+    </div>
+    
+    <!-- 加载必要的脚本 -->
+    <script src="js/config.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/systems/scoreSystem.js"></script>
+    
+    <script>
+        // 创建得分系统实例
+        const scoreSystem = new ScoreSystem();
+        let testCount = 0;
+        
+        // 更新得分显示
+        function updateScoreDisplay() {
+            const display = document.getElementById('score-display');
+            const stats = scoreSystem.getScoreStats();
+            display.innerHTML = `
+                当前得分: ${stats.formattedScore} | 
+                等级: ${stats.grade} | 
+                连击: ${stats.comboCount}x
+            `;
+        }
+        
+        // 记录日志
+        function log(message) {
+            const logElement = document.getElementById('test-log');
+            const timestamp = new Date().toLocaleTimeString();
+            logElement.textContent += `[${timestamp}] ${message}\n`;
+            logElement.scrollTop = logElement.scrollHeight;
+        }
+        
+        // 测试跳跃得分
+        function testJumpScore(size) {
+            testCount++;
+            const score = scoreSystem.addJumpScore('test', size);
+            updateScoreDisplay();
+            log(`测试 ${testCount}: 跳过${size === 'small' ? '小型' : size === 'medium' ? '中型' : '大型'}障碍物，获得 ${score} 分`);
+        }
+        
+        // 测试射击得分
+        function testShootScore() {
+            testCount++;
+            const score = scoreSystem.addShootingScore('floating');
+            updateScoreDisplay();
+            log(`测试 ${testCount}: 射击漂浮障碍物，获得 ${score} 分 (连击: ${scoreSystem.getComboCount()})`);
+            
+            // 模拟爆炸效果
+            setTimeout(() => {
+                log(`💥 漂浮障碍物爆炸消失！`);
+            }, 100);
+        }
+        
+        // 重置得分
+        function resetScore() {
+            scoreSystem.reset();
+            updateScoreDisplay();
+            testCount = 0;
+            log('得分系统已重置');
+        }
+        
+        // 测试连击
+        function testCombo() {
+            log('开始连击测试...');
+            for (let i = 0; i < 5; i++) {
+                setTimeout(() => {
+                    testShootScore();
+                }, i * 500);
+            }
+        }
+        
+        // 初始化
+        updateScoreDisplay();
+        log('新得分系统测试已准备就绪');
+        log('点击按钮测试不同的得分情况');
+        
+        // 显示得分配置
+        log('得分配置:');
+        log('- 小型障碍物: 10分');
+        log('- 中型障碍物: 20分');
+        log('- 大型障碍物: 30分');
+        log('- 漂浮障碍物: 30分 (射击)');
+        
+        // 测试障碍物类型映射
+        const typeMapping = {
+            'basic': 'small (10分)',
+            'tall': 'medium (20分)',
+            'wide': 'large (30分)'
+        };
+        
+        log('障碍物类型映射:');
+        Object.entries(typeMapping).forEach(([type, desc]) => {
+            log(`- ${type}: ${desc}`);
+        });
+    </script>
+</body>
+</html>

@@ -16,17 +16,29 @@ class ScoreSystem {
         // 得分配置
         this.config = {
             TIME_SCORE_RATE: 10,        // 每秒基础得分
-            OBSTACLE_BONUS: 50,         // 躲避障碍物奖励分数
+            OBSTACLE_BONUS: 50,         // 躲避障碍物奖励分数（已弃用，使用新的分级系统）
             DISTANCE_MULTIPLIER: 0.1,   // 距离得分倍数
             HIGH_SCORE_KEY: 'runnerGameHighScore',  // 本地存储键名
             
-            // 射击得分配置
+            // 跳跃躲避障碍物得分配置（新需求）
+            JUMP_SCORES: {
+                'small': 10,            // 小型障碍物
+                'medium': 20,           // 中型障碍物
+                'large': 30,            // 大型障碍物
+                'basic': 10,            // 基础障碍物（小型）
+                'tall': 20,             // 高障碍物（中型）
+                'wide': 30              // 宽障碍物（大型）
+            },
+            
+            // 射击得分配置（新需求）
             SHOOT_SCORES: {
-                'floating': 50,         // 普通漂浮障碍物
-                'floating_large': 100,  // 大型漂浮障碍物
-                'basic': 25,            // 基础地面障碍物（如果可射击）
-                'tall': 75,             // 高障碍物
-                'wide': 60              // 宽障碍物
+                'floating': 30,         // 漂浮障碍物统一30分
+                'floating_small': 30,   // 小型漂浮障碍物
+                'floating_medium': 30,  // 中型漂浮障碍物
+                'floating_large': 30,   // 大型漂浮障碍物
+                'basic': 30,            // 基础漂浮障碍物
+                'tall': 30,             // 高漂浮障碍物
+                'wide': 30              // 宽漂浮障碍物
             },
             
             // 连击奖励配置
@@ -72,10 +84,50 @@ class ScoreSystem {
     }
     
     /**
-     * 添加障碍物奖励得分
+     * 添加障碍物奖励得分（已弃用，使用addJumpScore）
      */
     addObstacleBonus() {
         this.addScore(this.config.OBSTACLE_BONUS);
+    }
+    
+    /**
+     * 添加跳跃躲避障碍物得分
+     * @param {string} obstacleType - 障碍物类型
+     * @param {string} obstacleSize - 障碍物大小 ('small', 'medium', 'large')
+     * @returns {number} 实际获得的得分
+     */
+    addJumpScore(obstacleType, obstacleSize = null) {
+        // 优先使用大小分类，其次使用类型分类
+        let scoreKey = obstacleSize || obstacleType;
+        
+        // 类型映射到大小
+        if (!obstacleSize) {
+            switch (obstacleType) {
+                case 'basic':
+                    scoreKey = 'small';
+                    break;
+                case 'tall':
+                    scoreKey = 'medium';
+                    break;
+                case 'wide':
+                    scoreKey = 'large';
+                    break;
+                default:
+                    scoreKey = 'small'; // 默认小型
+            }
+        }
+        
+        // 获取得分
+        const score = this.config.JUMP_SCORES[scoreKey] || this.config.JUMP_SCORES['small'];
+        
+        // 添加得分
+        this.addScore(score);
+        
+        if (GameConfig.DEBUG) {
+            console.log(`跳跃得分: 类型=${obstacleType}, 大小=${scoreKey}, 得分=${score}`);
+        }
+        
+        return score;
     }
     
     /**

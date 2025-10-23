@@ -36,7 +36,7 @@
     <div id="gameContainer">
         <canvas id="gameCanvas" width="800" height="400"></canvas>
         <div id="gameInfo">
-            <p>按空格键跳跃 | Q键射击漂浮障碍物 | 射击连击获得额外得分 | 得分: <span id="score">0</span></p>
+            <p>按空格键跳跃 | Q键射击漂浮障碍物 | 跳过障碍物得分：小10分 中20分 大30分 | 射击漂浮障碍物：30分 | 射击彩色漂浮物：无敌10秒 | 得分: <span id="score">0</span></p>
         </div>
     </div>
 
@@ -46,6 +46,8 @@
     <script src="js/input.js"></script>
     <script src="js/physics.js"></script>
     <script src="js/entities/entity.js"></script>
+    <script src="js/entities/characterAssets.js"></script>
+    <script src="js/entities/characterEffects.js"></script>
     <script src="js/entities/player.js"></script>
     <script src="js/entities/obstacle.js"></script>
     <script src="js/entities/bullet.js"></script>
@@ -59,6 +61,7 @@
     <script src="js/systems/scoreSystem.js"></script>
     <script src="js/systems/collisionSystem.js"></script>
     <script src="js/systems/effectSystem.js"></script>
+    <script src="js/systems/invincibilitySystem.js"></script>
     <script src="js/renderer.js"></script>
     <script src="js/objectPool.js"></script>
     <script src="js/performanceMonitor.js"></script>

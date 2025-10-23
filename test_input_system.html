@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>输入系统单元测试</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            background-color: #1a1a1a;
+            color: #00ff00;
+            padding: 20px;
+            margin: 0;
+        }
+        
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            color: #00ffff;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .test-output {
+            background-color: #000;
+            border: 2px solid #333;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            font-size: 14px;
+            line-height: 1.4;
+            white-space: pre-wrap;
+            overflow-x: auto;
+            max-height: 600px;
+            overflow-y: auto;
+        }
+        
+        .controls {
+            text-align: center;
+            margin: 20px 0;
+        }
+        
+        button {
+            background-color: #333;
+            color: #00ff00;
+            border: 2px solid #00ff00;
+            padding: 10px 20px;
+            margin: 0 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 14px;
+        }
+        
+        button:hover {
+            background-color: #00ff00;
+            color: #000;
+        }
+        
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .status {
+            text-align: center;
+            margin: 20px 0;
+            font-size: 18px;
+            font-weight: bold;
+        }
+        
+        .status.running {
+            color: #ffff00;
+        }
+        
+        .status.success {
+            color: #00ff00;
+        }
+        
+        .status.error {
+            color: #ff0000;
+        }
+        
+        .info {
+            background-color: #003366;
+            border: 1px solid #0066cc;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 20px 0;
+            color: #cccccc;
+        }
+        
+        .info h3 {
+            color: #00ccff;
+            margin-top: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>⌨️ 输入系统单元测试</h1>
+        
+        <div class="info">
+            <h3>测试说明</h3>
+            <p>本测试套件验证输入系统的以下功能：</p>
+            <ul>
+                <li><strong>键盘事件处理</strong>: 基础按键检测、Q键射击检测、单次触发检测</li>
+                <li><strong>输入状态管理</strong>: 多键同时按下、回调函数注册和触发</li>
+                <li><strong>射击冷却逻辑</strong>: 基础冷却功能、冷却时间更新、射击回调触发</li>
+            </ul>
+            <p>测试覆盖需求: 3.1 (键盘输入处理), 3.3 (跳跃输入), 7.1 (射击功能)</p>
+        </div>
+        
+        <div class="controls">
+            <button id="runTestsBtn" onclick="runTests()">🚀 运行测试</button>
+            <button id="clearOutputBtn" onclick="clearOutput()">🗑️ 清空输出</button>
+        </div>
+        
+        <div id="status" class="status"></div>
+        <div id="testOutput" class="test-output"></div>
+    </div>
+
+    <!-- 加载输入处理系统 -->
+    <script src="js/input.js"></script>
+    
+    <script>
+        // 测试工具函数
+        function assert(condition, message) {
+            if (!condition) {
+                throw new Error(`❌ 断言失败: ${message}`);
+            }
+            log(`✅ ${message}`);
+        }
+
+        function assertEquals(actual, expected, message) {
+            if (actual !== expected) {
+                throw new Error(`❌ 断言失败: ${message}. 期望: ${expected}, 实际: ${actual}`);
+            }
+            log(`✅ ${message}`);
+        }
+
+        // 日志输出函数
+        function log(message) {
+            const output = document.getElementById('testOutput');
+            output.textContent += message + '\n';
+            output.scrollTop = output.scrollHeight;
+        }
+
+        function clearOutput() {
+            document.getElementById('testOutput').textContent = '';
+            document.getElementById('status').textContent = '';
+            document.getElementById('status').className = 'status';
+        }
+
+        function setStatus(message, type = '') {
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = message;
+            statusEl.className = `status ${type}`;
+        }
+
+        // 输入系统测试套件
+        class InputSystemTestSuite {
+            constructor() {
+                this.inputHandler = null;
+                this.testCount = 0;
+                this.passedTests = 0;
+                this.originalEventListeners = {};
+            }
+            
+            setUp() {
+                // 创建新的输入处理器实例
+                this.inputHandler = new InputHandler();
+                
+                // 保存原始的事件监听器
+                this.originalEventListeners = {};
+                
+                // 重写 addEventListener 来捕获事件监听器
+                const originalAddEventListener = document.addEventListener;
+                document.addEventListener = (event, callback) => {
+                    this.originalEventListeners[event] = this.originalEventListeners[event] || [];
+                    this.originalEventListeners[event].push(callback);
+                };
+                
+                // 重新绑定事件（这会使用我们的重写版本）
+                this.inputHandler.bindEvents();
+                
+                // 恢复原始的 addEventListener
+                document.addEventListener = originalAddEventListener;
+            }
+            
+            tearDown() {
+                this.inputHandler = null;
+                this.originalEventListeners = {};
+            }
+            
+            // 模拟键盘事件
+            simulateKeyDown(keyCode) {
+                const event = {
+                    keyCode: keyCode,
+                    preventDefault: () => {}
+                };
+                
+                if (this.originalEventListeners['keydown']) {
+                    this.originalEventListeners['keydown'].forEach(callback => {
+                        callback(event);
+                    });
+                }
+            }
+            
+            simulateKeyUp(keyCode) {
+                const event = {
+                    keyCode: keyCode,
+                    preventDefault: () => {}
+                };
+                
+                if (this.originalEventListeners['keyup']) {
+                    this.originalEventListeners['keyup'].forEach(callback => {
+                        callback(event);
+                    });
+                }
+            }
+            
+            // 等待指定时间
+            async wait(ms) {
+                return new Promise(resolve => setTimeout(resolve, ms));
+            }
+            
+            runTest(testName, testFunction) {
+                this.testCount++;
+                log(`\n🧪 测试: ${testName}`);
+                
+                try {
+                    this.setUp();
+                    testFunction.call(this);
+                    this.passedTests++;
+                    log(`✅ ${testName} - 通过`);
+                } catch (error) {
+                    log(`❌ ${testName} - 失败: ${error.message}`);
+                } finally {
+                    this.tearDown();
+                }
+            }
+            
+            async runAsyncTest(testName, testFunction) {
+                this.testCount++;
+                log(`\n🧪 测试: ${testName}`);
+                
+                try {
+                    this.setUp();
+                    await testFunction.call(this);
+                    this.passedTests++;
+                    log(`✅ ${testName} - 通过`);
+                } catch (error) {
+                    log(`❌ ${testName} - 失败: ${error.message}`);
+                } finally {
+                    this.tearDown();
+                }
+            }
+            
+            // 测试1: 键盘事件处理 - 基础按键检测
+            testBasicKeyDetection() {
+                // 测试空格键（32）
+                this.simulateKeyDown(32);
+                assert(this.inputHandler.isKeyPressed(32), '空格键按下后应该被检测到');
+                assert(this.inputHandler.isKeyPressed('Space'), '空格键按下后应该通过键名被检测到');
+                
+                this.simulateKeyUp(32);
+                assert(!this.inputHandler.isKeyPressed(32), '空格键释放后应该不被检测到');
+                assert(!this.inputHandler.isKeyPressed('Space'), '空格键释放后应该通过键名不被检测到');
+            }
+            
+            // 测试2: 键盘事件处理 - Q键射击检测
+            testShootKeyDetection() {
+                // 测试Q键（81）
+                this.simulateKeyDown(81);
+                assert(this.inputHandler.isKeyPressed(81), 'Q键按下后应该被检测到');
+                assert(this.inputHandler.isKeyPressed('KeyQ'), 'Q键按下后应该通过键名被检测到');
+                assert(this.inputHandler.isShootKeyPressed(), '射击键按下后应该被检测到');
+                
+                this.simulateKeyUp(81);
+                assert(!this.inputHandler.isKeyPressed(81), 'Q键释放后应该不被检测到');
+                assert(!this.inputHandler.isShootKeyPressed(), '射击键释放后应该不被检测到');
+            }
+            
+            // 测试3: 键盘事件处理 - 单次触发检测
+            testJustPressedDetection() {
+                // 测试单次触发功能
+                this.simulateKeyDown(32);
+                assert(this.inputHandler.isKeyJustPressed(32), '空格键刚按下时应该被单次触发检测到');
+                assert(!this.inputHandler.isKeyJustPressed(32), '空格键第二次检查时不应该被单次触发检测到');
+                
+                // 重新按下应该再次触发
+                this.simulateKeyUp(32);
+                this.simulateKeyDown(32);
+                assert(this.inputHandler.isKeyJustPressed(32), '空格键重新按下时应该再次被单次触发检测到');
+            }
+            
+            // 测试4: 输入状态管理 - 多键同时按下
+            testMultipleKeysPressed() {
+                // 同时按下多个键
+                this.simulateKeyDown(32); // 空格键
+                this.simulateKeyDown(81); // Q键
+                this.simulateKeyDown(82); // R键
+                
+                assert(this.inputHandler.isKeyPressed(32), '空格键应该被检测到');
+                assert(this.inputHandler.isKeyPressed(81), 'Q键应该被检测到');
+                assert(this.inputHandler.isKeyPressed(82), 'R键应该被检测到');
+                
+                // 释放其中一个键
+                this.simulateKeyUp(32);
+                assert(!this.inputHandler.isKeyPressed(32), '空格键释放后应该不被检测到');
+                assert(this.inputHandler.isKeyPressed(81), 'Q键应该仍然被检测到');
+                assert(this.inputHandler.isKeyPressed(82), 'R键应该仍然被检测到');
+            }
+            
+            // 测试5: 输入状态管理 - 回调函数注册和触发
+            testKeyCallbacks() {
+                let spaceCallbackTriggered = false;
+                let qCallbackTriggered = false;
+                let keyUpCallbackTriggered = false;
+                
+                // 注册回调函数
+                this.inputHandler.onKeyDown(32, () => {
+                    spaceCallbackTriggered = true;
+                });
+                
+                this.inputHandler.onKeyDown(81, () => {
+                    qCallbackTriggered = true;
+                });
+                
+                this.inputHandler.onKeyUp(32, () => {
+                    keyUpCallbackTriggered = true;
+                });
+                
+                // 触发按键事件
+                this.simulateKeyDown(32);
+                assert(spaceCallbackTriggered, '空格键按下回调应该被触发');
+                
+                this.simulateKeyDown(81);
+                assert(qCallbackTriggered, 'Q键按下回调应该被触发');
+                
+                this.simulateKeyUp(32);
+                assert(keyUpCallbackTriggered, '空格键释放回调应该被触发');
+            }
+            
+            // 测试6: 射击冷却逻辑 - 基础冷却功能
+            testShootCooldownBasic() {
+                // 初始状态应该可以射击
+                assert(this.inputHandler.canShoot(), '初始状态应该可以射击');
+                assertEquals(this.inputHandler.getShootCooldownRemaining(), 0, '初始冷却剩余时间应该为0');
+                
+                // 模拟射击
+                this.inputHandler.handleShootInput();
+                assert(!this.inputHandler.canShoot(), '射击后应该不能立即再次射击');
+                assert(this.inputHandler.getShootCooldownRemaining() > 0, '射击后冷却剩余时间应该大于0');
+            }
+            
+            // 测试7: 射击冷却逻辑 - 射击回调注册和触发
+            testShootCallback() {
+                let shootCallbackTriggered = false;
+                let shootCount = 0;
+                
+                // 注册射击回调
+                this.inputHandler.onShoot(() => {
+                    shootCallbackTriggered = true;
+                    shootCount++;
+                });
+                
+                // 第一次射击应该触发回调
+                this.inputHandler.handleShootInput();
+                assert(shootCallbackTriggered, '射击回调应该被触发');
+                assertEquals(shootCount, 1, '射击计数应该为1');
+                
+                // 立即再次射击不应该触发回调（冷却中）
+                shootCallbackTriggered = false;
+                this.inputHandler.handleShootInput();
+                assert(!shootCallbackTriggered, '冷却期间射击回调不应该被触发');
+                assertEquals(shootCount, 1, '射击计数应该仍然为1');
+            }
+            
+            // 测试8: 射击冷却逻辑 - 通过按键触发射击
+            testShootKeyTrigger() {
+                let shootTriggered = false;
+                
+                this.inputHandler.onShoot(() => {
+                    shootTriggered = true;
+                });
+                
+                // 按下Q键应该触发射击
+                this.simulateKeyDown(81);
+                assert(shootTriggered, '按下Q键应该触发射击');
+            }
+            
+            // 测试9: 射击冷却逻辑 - 冷却时间更新
+            async testShootCooldownUpdate() {
+                // 设置较短的冷却时间便于测试
+                this.inputHandler.setShootCooldown(100); // 100毫秒
+                
+                // 射击
+                this.inputHandler.handleShootInput();
+                assert(!this.inputHandler.canShoot(), '射击后应该不能立即再次射击');
+                
+                // 等待冷却时间过去
+                await this.wait(150);
+                
+                assert(this.inputHandler.canShoot(), '冷却时间过后应该可以再次射击');
+                assertEquals(this.inputHandler.getShootCooldownRemaining(), 0, '冷却时间过后剩余时间应该为0');
+            }
+            
+            // 测试10: 边界情况 - 无效键码处理
+            testInvalidKeyCode() {
+                // 测试不存在的键码
+                assert(!this.inputHandler.isKeyPressed(999), '不存在的键码应该返回false');
+                assert(!this.inputHandler.isKeyPressed('InvalidKey'), '不存在的键名应该返回false');
+                
+                // 测试undefined和null
+                assert(!this.inputHandler.isKeyPressed(undefined), 'undefined键码应该返回false');
+                assert(!this.inputHandler.isKeyPressed(null), 'null键码应该返回false');
+            }
+            
+            // 运行所有测试
+            async runAllTests() {
+                log('🚀 开始运行输入系统单元测试\n');
+                setStatus('正在运行测试...', 'running');
+                
+                // 键盘事件处理测试
+                this.runTest('基础按键检测', this.testBasicKeyDetection);
+                this.runTest('Q键射击检测', this.testShootKeyDetection);
+                this.runTest('单次触发检测', this.testJustPressedDetection);
+                
+                // 输入状态管理测试
+                this.runTest('多键同时按下', this.testMultipleKeysPressed);
+                this.runTest('回调函数注册和触发', this.testKeyCallbacks);
+                
+                // 射击冷却逻辑测试
+                this.runTest('基础射击冷却功能', this.testShootCooldownBasic);
+                this.runTest('射击回调注册和触发', this.testShootCallback);
+                this.runTest('通过按键触发射击', this.testShootKeyTrigger);
+                
+                // 异步测试
+                await this.runAsyncTest('冷却时间更新', this.testShootCooldownUpdate);
+                
+                // 边界情况测试
+                this.runTest('无效键码处理', this.testInvalidKeyCode);
+                
+                // 输出测试结果
+                log('\n📊 测试结果统计:');
+                log(`总测试数: ${this.testCount}`);
+                log(`通过测试: ${this.passedTests}`);
+                log(`失败测试: ${this.testCount - this.passedTests}`);
+                log(`成功率: ${((this.passedTests / this.testCount) * 100).toFixed(1)}%`);
+                
+                if (this.passedTests === this.testCount) {
+                    log('\n🎉 所有输入系统测试通过！');
+                    setStatus('所有测试通过！', 'success');
+                } else {
+                    log('\n⚠️ 部分测试失败，请检查实现。');
+                    setStatus(`${this.testCount - this.passedTests} 个测试失败`, 'error');
+                }
+            }
+        }
+
+        // 运行测试的全局函数
+        async function runTests() {
+            const runBtn = document.getElementById('runTestsBtn');
+            runBtn.disabled = true;
+            
+            try {
+                const testSuite = new InputSystemTestSuite();
+                await testSuite.runAllTests();
+            } catch (error) {
+                log(`\n❌ 测试运行出错: ${error.message}`);
+                setStatus('测试运行出错', 'error');
+            } finally {
+                runBtn.disabled = false;
+            }
+        }
+
+        // 页面加载完成后的初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            log('⌨️ 输入系统单元测试准备就绪');
+            log('点击"运行测试"按钮开始测试\n');
+        });
+    </script>
+</body>
+</html>
